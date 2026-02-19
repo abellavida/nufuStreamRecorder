@@ -1,102 +1,103 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DVR Recorder</title>
+    <title>DVR Manager</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <style>
-        .day-check { margin-right: 10px; }
-        .card { border-radius: 12px; }
-    </style>
 </head>
-<body class="container mt-4 bg-light">
-    <h2 class="mb-4">📽️ IPTV DVR Manager</h2>
-
-    <div class="row">
-        <div class="col-md-5">
-            <div class="card p-4 shadow-sm mb-4">
-                <h5>Schedule New Event</h5>
-                <form action="/add" method="post" id="recordForm">
+<body class="container-fluid py-4 bg-light">
+    <div class="row px-3">
+        <div class="col-lg-3">
+            <div class="card p-3 shadow-sm mb-4">
+                <h5 class="card-title">Schedule New Recording</h5>
+                <form action="/add" method="post">
                     <input type="hidden" name="stream_name" id="stream_name">
-
-                    <label class="form-label">Stream Choice:</label>
-                    <select name="stream_id" class="form-select mb-3" onchange="updateName(this)" required>
-                        <option value="">-- Choose Channel or Fixture --</option>
+                    <select name="stream_id" class="form-select mb-2" onchange="document.getElementById('stream_name').value=this.options[this.selectedIndex].text" required>
+                        <option value="">-- Choose Stream --</option>
                         {% for cat, items in data.items() if items is iterable %}
                             <optgroup label="{{ cat.upper() }}">
                             {% for item in items %}
-                                <option value="{{ item.channel_id or item.fixture_id }}">
-                                    {{ item.channel_name or item.fixture_name }}
-                                </option>
+                                <option value="{{ item.channel_id or item.fixture_id }}">{{ item.channel_name or item.fixture_name }}</option>
                             {% endfor %}
                             </optgroup>
                         {% endfor %}
                     </select>
-
-                    <label class="form-label">Days to Record:</label>
-                    <div class="mb-3">
+                    <div class="mb-2">
                         {% for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] %}
                         <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" name="days" value="{{ day }}" id="day_{{ day }}">
-                            <label class="form-check-label" for="day_{{ day }}">{{ day[:3]|capitalize }}</label>
+                            <input class="form-check-input" type="checkbox" name="days" value="{{ day }}" id="d_{{ day }}">
+                            <label class="form-check-label" for="d_{{ day }}">{{ day[:1]|capitalize }}</label>
                         </div>
                         {% endfor %}
                     </div>
-
-                    <div class="row">
-                        <div class="col">
-                            <label class="form-label">Time:</label>
-                            <input type="time" name="time" class="form-control mb-3" required>
-                        </div>
-                        <div class="col">
-                            <label class="form-label">Hours:</label>
-                            <input type="number" step="0.5" name="hours" class="form-control mb-3" placeholder="1.0" required>
-                        </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col"><input type="time" name="time" class="form-control" required></div>
+                        <div class="col"><input type="number" step="0.1" min="0.1" name="hours" class="form-control" placeholder="Hrs" required></div>
                     </div>
-
                     <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" name="repeat" id="repeatToggle" checked>
-                        <label class="form-check-label" for="repeatToggle">Repeat Weekly</label>
+                        <input class="form-check-input" type="checkbox" name="repeat" checked>
+                        <label class="form-check-label">Repeat Weekly</label>
                     </div>
-
-                    <button type="submit" class="btn btn-primary w-100">Add to DVR List</button>
+                    <button type="submit" class="btn btn-primary w-100">Add to Schedule</button>
                 </form>
+            </div>
+
+            <div class="card p-3 shadow-sm">
+                <h6>Active Recordings</h6>
+                {% for name in active %}
+                    <div class="badge bg-danger mb-1 p-2 w-100">🔴 {{ name }}</div>
+                {% else %}
+                    <small class="text-muted italic">None</small>
+                {% endfor %}
             </div>
         </div>
 
-        <div class="col-md-7">
-            <h5>Currently Active Recordings</h5>
-            <div class="mb-4">
-                {% if active %}
-                    {% for name in active %}
-                        <div class="alert alert-danger py-2">🔴 Recording: <strong>{{ name }}</strong></div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted italic">No active recordings.</p>
-                {% endif %}
-            </div>
-
-            <h5>Scheduled Tasks</h5>
-            <div class="table-responsive">
-                <table class="table table-hover bg-white shadow-sm">
+        <div class="col-lg-9">
+            <h5 class="mb-3">Planned Schedules</h5>
+            <div class="table-responsive mb-5">
+                <table class="table table-sm table-hover bg-white shadow-sm align-middle">
                     <thead class="table-dark">
                         <tr>
-                            <th>Channel/Fixture</th>
+                            <th>Name</th>
+                            <th>ID</th>
                             <th>Days</th>
                             <th>Time</th>
-                            <th>Dur</th>
+                            <th>Duration (H:M)</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for s in schedules %}
                         <tr>
-                            <td>{{ s.name }} <br><small class="text-muted">ID: {{ s.id }}</small></td>
-                            <td><small>{{ s.days|join(', ')|capitalize }}</small></td>
+                            <td class="fw-bold">{{ s.name }}</td>
+                            <td><code class="text-muted">{{ s.id }}</code></td>
+                            <td><small class="text-uppercase">{{ s.days|map('truncate', 3, True, '')|join(', ') }}</small></td>
                             <td>{{ s.time }}</td>
-                            <td>{{ s.duration // 3600 }}h</td>
                             <td>
-                                <a href="/delete/{{ s.uuid }}" class="btn btn-sm btn-outline-danger">Delete</a>
+                                {{ s.duration // 3600 }}:{{ "%02d" % ((s.duration % 3600) // 60) }}
                             </td>
+                            <td><a href="/delete/{{ s.uuid }}" class="btn btn-sm btn-outline-danger">Delete</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <h5 class="mb-3">Completed Recordings (Disk)</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped bg-white shadow-sm align-middle">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>Filename</th>
+                            <th>Recorded On</th>
+                            <th>Size</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in files %}
+                        <tr>
+                            <td class="text-primary">{{ f.name }}</td>
+                            <td>{{ f.date }}</td>
+                            <td>{{ f.size }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -104,13 +105,5 @@
             </div>
         </div>
     </div>
-
-    <script>
-        // Simple JS to capture the name of the selection for the table display
-        function updateName(select) {
-            const name = select.options[select.selectedIndex].text;
-            document.getElementById('stream_name').value = name;
-        }
-    </script>
 </body>
 </html>
