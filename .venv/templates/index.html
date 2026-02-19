@@ -1,17 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DVR Manager</title>
+    <title>DVR Manager Pro</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        .search-box { margin-bottom: 10px; border-radius: 20px; padding-left: 15px; }
+        .card { border-radius: 15px; }
+        .table-container { max-height: 600px; overflow-y: auto; }
+    </style>
 </head>
 <body class="container-fluid py-4 bg-light">
     <div class="row px-3">
         <div class="col-lg-3">
             <div class="card p-3 shadow-sm mb-4">
-                <h5 class="card-title">Schedule New Recording</h5>
+                <h5 class="card-title">Schedule Recording</h5>
                 <form action="/add" method="post">
                     <input type="hidden" name="stream_name" id="stream_name">
-                    <select name="stream_id" class="form-select mb-2" onchange="document.getElementById('stream_name').value=this.options[this.selectedIndex].text" required>
+
+                    <input type="text" id="streamSearch" class="form-control search-box form-control-sm" placeholder="🔍 Filter channels...">
+
+                    <select name="stream_id" id="streamSelect" class="form-select mb-2" onchange="document.getElementById('stream_name').value=this.options[this.selectedIndex].text" required>
                         <option value="">-- Choose Stream --</option>
                         {% for cat, items in data.items() if items is iterable %}
                             <optgroup label="{{ cat.upper() }}">
@@ -21,18 +29,24 @@
                             </optgroup>
                         {% endfor %}
                     </select>
+
+                    <label class="small text-muted">Alternate Name (Optional):</label>
+                    <input type="text" name="alt_name" class="form-control mb-2" placeholder="e.g. Episode_1">
+
                     <div class="mb-2">
                         {% for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] %}
                         <div class="form-check form-check-inline">
                             <input class="form-check-input" type="checkbox" name="days" value="{{ day }}" id="d_{{ day }}">
-                            <label class="form-check-label" for="d_{{ day }}">{{ day[:1]|capitalize }}</label>
+                            <label class="form-check-label" for="d_{{ day }}"><small>{{ day[:1]|capitalize }}</small></label>
                         </div>
                         {% endfor %}
                     </div>
+
                     <div class="row g-2 mb-2">
                         <div class="col"><input type="time" name="time" class="form-control" required></div>
                         <div class="col"><input type="number" step="0.1" min="0.1" name="hours" class="form-control" placeholder="Hrs" required></div>
                     </div>
+
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" name="repeat" checked>
                         <label class="form-check-label">Repeat Weekly</label>
@@ -44,9 +58,9 @@
             <div class="card p-3 shadow-sm">
                 <h6>Active Recordings</h6>
                 {% for name in active %}
-                    <div class="badge bg-danger mb-1 p-2 w-100">🔴 {{ name }}</div>
+                    <div class="badge bg-danger mb-1 p-2 w-100 text-start">🔴 {{ name }}</div>
                 {% else %}
-                    <small class="text-muted italic">None</small>
+                    <small class="text-muted">No active streams</small>
                 {% endfor %}
             </div>
         </div>
@@ -58,10 +72,11 @@
                     <thead class="table-dark">
                         <tr>
                             <th>Name</th>
+                            <th>Alt Name</th>
                             <th>ID</th>
                             <th>Days</th>
                             <th>Time</th>
-                            <th>Duration (H:M)</th>
+                            <th>Duration</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -69,12 +84,11 @@
                         {% for s in schedules %}
                         <tr>
                             <td class="fw-bold">{{ s.name }}</td>
+                            <td class="text-info">{{ s.alt_name or '--' }}</td>
                             <td><code class="text-muted">{{ s.id }}</code></td>
-                            <td><small class="text-uppercase">{{ s.days|map('truncate', 3, True, '')|join(', ') }}</small></td>
+                            <td><small class="text-uppercase text-secondary">{{ s.days|map('truncate', 3, True, '')|join(', ') }}</small></td>
                             <td>{{ s.time }}</td>
-                            <td>
-                                {{ s.duration // 3600 }}:{{ "%02d" % ((s.duration % 3600) // 60) }}
-                            </td>
+                            <td>{{ s.duration // 3600 }}:{{ "%02d" % ((s.duration % 3600) // 60) }}</td>
                             <td><a href="/delete/{{ s.uuid }}" class="btn btn-sm btn-outline-danger">Delete</a></td>
                         </tr>
                         {% endfor %}
@@ -82,9 +96,13 @@
                 </table>
             </div>
 
-            <h5 class="mb-3">Completed Recordings (Disk)</h5>
-            <div class="table-responsive">
-                <table class="table table-sm table-striped bg-white shadow-sm align-middle">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>Completed Recordings (Disk)</h5>
+                <input type="text" id="fileSearch" class="form-control w-25 search-box" placeholder="🔍 Search files...">
+            </div>
+
+            <div class="table-responsive table-container">
+                <table id="fileTable" class="table table-sm table-striped bg-white shadow-sm align-middle">
                     <thead class="table-secondary">
                         <tr>
                             <th>Filename</th>
@@ -95,7 +113,7 @@
                     <tbody>
                         {% for f in files %}
                         <tr>
-                            <td class="text-primary">{{ f.name }}</td>
+                            <td class="text-primary fw-bold">{{ f.name }}</td>
                             <td>{{ f.date }}</td>
                             <td>{{ f.size }}</td>
                         </tr>
@@ -105,5 +123,27 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // Dropdown Search Logic
+        document.getElementById('streamSearch').addEventListener('keyup', function() {
+            let filter = this.value.toLowerCase();
+            let options = document.getElementById('streamSelect').options;
+            for (let i = 0; i < options.length; i++) {
+                let text = options[i].text.toLowerCase();
+                options[i].style.display = text.includes(filter) ? "" : "none";
+            }
+        });
+
+        // File Table Search Logic
+        document.getElementById('fileSearch').addEventListener('keyup', function() {
+            let filter = this.value.toLowerCase();
+            let rows = document.getElementById('fileTable').getElementsByTagName('tr');
+            for (let i = 1; i < rows.length; i++) {
+                let fileName = rows[i].getElementsByTagName('td')[0].textContent.toLowerCase();
+                rows[i].style.display = fileName.includes(filter) ? "" : "none";
+            }
+        });
+    </script>
 </body>
 </html>
