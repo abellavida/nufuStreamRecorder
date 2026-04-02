@@ -1,1 +1,14 @@
-[]
+[
+    {
+        "uuid": "3e87e0d4-f977-410a-8f76-83758f1a2044",
+        "id": "137",
+        "name": "NESN",
+        "alt_name": "Bruins",
+        "time": "19:00",
+        "duration": 12600,
+        "days": [
+            "thursday"
+        ],
+        "repeat": false
+    }
+]

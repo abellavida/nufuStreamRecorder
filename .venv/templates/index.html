@@ -1,130 +1,185 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DVR Manager Pro</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        .search-box { margin-bottom: 10px; border-radius: 20px; padding-left: 15px; }
-        .card { border-radius: 15px; }
-        .table-container { max-height: 600px; overflow-y: auto; }
+        :root { --accent-color: #0d6efd; }
+        body { font-size: 0.95rem; }
+
+        /* Larger touch targets for mobile */
+        .form-control, .form-select, .btn { padding: 0.6rem 1rem; }
+        .search-box { margin-bottom: 12px; border-radius: 25px; padding-left: 15px; }
+
+        /* Card styling */
+        .card { border-radius: 12px; border: none; margin-bottom: 1.5rem; }
+        .card-title { font-weight: 700; color: #333; }
+
+        /* Handle long filenames and table overflow */
+        .table-container { max-height: 500px; overflow-y: auto; }
+        .table th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Responsive Table: Hide extra info on mobile to save space */
+        @media (max-width: 768px) {
+            .hide-mobile { display: none !important; }
+            .btn-sm { padding: 0.5rem 0.8rem; width: 100%; } /* Full width buttons on mobile */
+            .search-box-mobile { width: 100% !important; margin-top: 10px; }
+        }
+
+        /* Day Checkboxes Styling */
+        .day-btn-group .form-check-inline { margin-right: 5px; margin-bottom: 5px; }
     </style>
 </head>
-<body class="container-fluid py-4 bg-light">
-    <div class="row px-3">
-        <div class="col-lg-3">
-            <div class="card p-3 shadow-sm mb-4">
-                <h5 class="card-title">Schedule Recording</h5>
-                <form action="/add" method="post">
-                    <input type="hidden" name="stream_name" id="stream_name">
+<body class="bg-light">
 
-                    <input type="text" id="streamSearch" class="form-control search-box form-control-sm" placeholder="🔍 Filter channels...">
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">📺 DVR Pro</span>
+            {% if active %}
+                <span class="badge bg-danger pulse">● {{ active|length }} Recording Active</span>
+            {% endif %}
+        </div>
+    </nav>
 
-                    <select name="stream_id" id="streamSelect" class="form-select mb-2" onchange="document.getElementById('stream_name').value=this.options[this.selectedIndex].text" required>
-                        <option value="">-- Choose Stream --</option>
-                        {% for cat, items in data.items() if items is iterable %}
-                            <optgroup label="{{ cat.upper() }}">
-                            {% for item in items %}
-                                <option value="{{ item.channel_id or item.fixture_id }}">{{ item.channel_name or item.fixture_name }}</option>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12 col-lg-3">
+
+                <div class="card p-3 shadow-sm">
+                    <h5 class="card-title mb-3">Schedule Recording</h5>
+                    <form action="/add" method="post">
+                        <input type="hidden" name="stream_name" id="stream_name">
+
+                        <input type="text" id="streamSearch" class="form-control search-box" placeholder="🔍 Filter channels...">
+
+                        <select name="stream_id" id="streamSelect" class="form-select mb-3" onchange="document.getElementById('stream_name').value=this.options[this.selectedIndex].text" required>
+                            <option value="">-- Choose Stream --</option>
+                            {% for cat, items in data.items() if items is iterable %}
+                                <optgroup label="{{ cat.upper() }}">
+                                {% for item in items %}
+                                    <option value="{{ item.channel_id or item.fixture_id }}">{{ item.channel_name or item.fixture_name }}</option>
+                                {% endfor %}
+                                </optgroup>
                             {% endfor %}
-                            </optgroup>
-                        {% endfor %}
-                    </select>
+                        </select>
 
-                    <label class="small text-muted">Alternate Name (Optional):</label>
-                    <input type="text" name="alt_name" class="form-control mb-2" placeholder="e.g. Episode_1">
-
-                    <div class="mb-2">
-                        {% for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] %}
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" name="days" value="{{ day }}" id="d_{{ day }}">
-                            <label class="form-check-label" for="d_{{ day }}"><small>{{ day[:1]|capitalize }}</small></label>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Alternate Name (Optional)</label>
+                            <input type="text" name="alt_name" class="form-control" placeholder="e.g. Episode_1">
                         </div>
-                        {% endfor %}
+
+                        <div class="day-btn-group mb-3">
+                            <label class="form-label d-block small fw-bold">Repeat Days</label>
+                            {% for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] %}
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="days" value="{{ day }}" id="d_{{ day }}">
+                                <label class="form-check-label small" for="d_{{ day }}">{{ day[:3]|capitalize }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-7">
+                                <label class="form-label small fw-bold">Start Time</label>
+                                <input type="time" name="time" class="form-control" required>
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label small fw-bold">Duration</label>
+                                <input type="number" step="0.1" min="0.1" name="hours" class="form-control" placeholder="Hrs" required>
+                            </div>
+                        </div>
+
+                        <div class="form-check form-switch mb-4">
+                            <input class="form-check-input" type="checkbox" name="repeat" id="repeatSwitch" checked>
+                            <label class="form-check-label small" for="repeatSwitch">Repeat Weekly</label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 fw-bold">Add to Schedule</button>
+                    </form>
+                </div>
+
+                <div class="card p-3 shadow-sm">
+                    <h6 class="card-title border-bottom pb-2">Active Now</h6>
+                    {% for name in active %}
+                        <div class="alert alert-danger py-2 px-3 mb-2 small d-flex align-items-center">
+                            <span class="spinner-grow spinner-grow-sm me-2" role="status"></span>
+                            {{ name }}
+                        </div>
+                    {% else %}
+                        <small class="text-muted">No active streams</small>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-9">
+
+                <div class="card p-3 shadow-sm">
+                    <h5 class="mb-3 card-title">Planned Schedules</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Channel / Name</th>
+                                    <th class="hide-mobile">ID</th>
+                                    <th>Schedule</th>
+                                    <th class="hide-mobile">Duration</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in schedules %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ s.name }}</div>
+                                        <div class="text-info small">{{ s.alt_name or '' }}</div>
+                                    </td>
+                                    <td class="hide-mobile"><code class="text-muted small">{{ s.id }}</code></td>
+                                    <td>
+                                        <div class="small fw-bold text-primary">{{ s.time }}</div>
+                                        <div class="small text-uppercase text-muted" style="font-size: 0.7rem;">
+                                            {{ s.days|map('truncate', 3, True, '')|join(', ') }}
+                                        </div>
+                                    </td>
+                                    <td class="hide-mobile">{{ s.duration // 3600 }}:{{ "%02d" % ((s.duration % 3600) // 60) }}</td>
+                                    <td><a href="/delete/{{ s.uuid }}" class="btn btn-sm btn-outline-danger">Delete</a></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card p-3 shadow-sm">
+                    <div class="d-md-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">Completed Recordings</h5>
+                        <input type="text" id="fileSearch" class="form-control w-25 search-box search-box-mobile" placeholder="🔍 Search files...">
                     </div>
 
-                    <div class="row g-2 mb-2">
-                        <div class="col"><input type="time" name="time" class="form-control" required></div>
-                        <div class="col"><input type="number" step="0.1" min="0.1" name="hours" class="form-control" placeholder="Hrs" required></div>
+                    <div class="table-responsive table-container">
+                        <table id="fileTable" class="table table-sm table-striped align-middle">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th>Filename</th>
+                                    <th class="hide-mobile">Recorded On</th>
+                                    <th>Size</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in files %}
+                                <tr>
+                                    <td class="text-primary text-break" style="max-width: 200px;">{{ f.name }}</td>
+                                    <td class="hide-mobile small">{{ f.date }}</td>
+                                    <td class="small">{{ f.size }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
+                </div>
 
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" name="repeat" checked>
-                        <label class="form-check-label">Repeat Weekly</label>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Add to Schedule</button>
-                </form>
-            </div>
-
-            <div class="card p-3 shadow-sm">
-                <h6>Active Recordings</h6>
-                {% for name in active %}
-                    <div class="badge bg-danger mb-1 p-2 w-100 text-start">🔴 {{ name }}</div>
-                {% else %}
-                    <small class="text-muted">No active streams</small>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="col-lg-9">
-            <h5 class="mb-3">Planned Schedules</h5>
-            <div class="table-responsive mb-5">
-                <table class="table table-sm table-hover bg-white shadow-sm align-middle">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Name</th>
-                            <th>Alt Name</th>
-                            <th>ID</th>
-                            <th>Days</th>
-                            <th>Time</th>
-                            <th>Duration</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for s in schedules %}
-                        <tr>
-                            <td class="fw-bold">{{ s.name }}</td>
-                            <td class="text-info">{{ s.alt_name or '--' }}</td>
-                            <td><code class="text-muted">{{ s.id }}</code></td>
-                            <td><small class="text-uppercase text-secondary">{{ s.days|map('truncate', 3, True, '')|join(', ') }}</small></td>
-                            <td>{{ s.time }}</td>
-                            <td>{{ s.duration // 3600 }}:{{ "%02d" % ((s.duration % 3600) // 60) }}</td>
-                            <td><a href="/delete/{{ s.uuid }}" class="btn btn-sm btn-outline-danger">Delete</a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5>Completed Recordings (Disk)</h5>
-                <input type="text" id="fileSearch" class="form-control w-25 search-box" placeholder="🔍 Search files...">
-            </div>
-
-            <div class="table-responsive table-container">
-                <table id="fileTable" class="table table-sm table-striped bg-white shadow-sm align-middle">
-                    <thead class="table-secondary">
-                        <tr>
-                            <th>Filename</th>
-                            <th>Recorded On</th>
-                            <th>Size</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for f in files %}
-                        <tr>
-                            <td class="text-primary fw-bold">{{ f.name }}</td>
-                            <td>{{ f.date }}</td>
-                            <td>{{ f.size }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <script>
+            </div> </div> </div> <script>
         // Dropdown Search Logic
         document.getElementById('streamSearch').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
