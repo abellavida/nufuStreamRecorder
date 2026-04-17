@@ -11,8 +11,10 @@ from flask import Flask, render_template, request, redirect, url_for
 from logging.handlers import RotatingFileHandler
 import schedule
 
+user_nufu_url = "https://nufu.tv/json/YOUR_NUFU_JSON_URL"
+
 # --- 1. Configuration ---
-JSON_API_URL = "https://nufu.tv/json/jcarter@abellavida.com"
+JSON_API_URL = user_nufu_url
 SAVE_FOLDER = "/home/jc3/Videos/"
 DB_FILE = "schedules.json"
 LOG_PATH = "/home/jc3/Videos/dvr_app.log"
