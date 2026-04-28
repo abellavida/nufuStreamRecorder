@@ -1,5 +1,7 @@
 import subprocess
 import json
+from pickle import TRUE
+
 import requests
 import os
 import time
@@ -11,11 +13,10 @@ from flask import Flask, render_template, request, redirect, url_for
 from logging.handlers import RotatingFileHandler
 import schedule
 
-user_nufu_url = "https://nufu.tv/json/YOUR_NUFU_JSON_URL"
-
 # --- 1. Configuration ---
-JSON_API_URL = user_nufu_url
+JSON_API_URL = "https://nufu.tv/json/jcarter@abellavida.com"
 SAVE_FOLDER = "/home/jc3/Videos/"
+# JSON_API_URL = "https://tvpass.org/playlist.m3u"
 DB_FILE = "schedules.json"
 LOG_PATH = "/home/jc3/Videos/dvr_app.log"
 
@@ -170,4 +171,4 @@ def delete(task_uuid):
 
 if __name__ == '__main__':
     threading.Thread(target=run_scheduler, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5050, debug=True)
