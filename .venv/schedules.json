@@ -1,1 +1,14 @@
-[]
+[
+    {
+        "uuid": "2f26b5ed-47b8-47ea-91b5-2d078ff7cedb",
+        "id": "12",
+        "name": "NHL Network",
+        "alt_name": "",
+        "time": "10:00",
+        "duration": 360,
+        "days": [
+            "wednesday"
+        ],
+        "repeat": false
+    }
+]
