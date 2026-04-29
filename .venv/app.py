@@ -20,27 +20,34 @@ STREAM_LOG = os.path.join(BASE_DIR, "stream_debug.log")
 
 app = Flask(__name__)
 
+# --- 2. Logging Setup ---
+server_handler = RotatingFileHandler(SERVER_LOG, maxBytes=10 * 1024 * 1024, backupCount=5)
+logging.basicConfig(
+    handlers=[server_handler],
+    level=logging.INFO,
+    format='%(asctime)s - [%(threadName)s] - %(levelname)s - %(message)s'
+)
 
-# --- 2. Configuration Management ---
+
+# --- 3. Configuration Management ---
 def get_settings():
     defaults = {
         "api_key": "",
         "api_url": "https://nufu.tv/json/jcarter@abellavida.com",
         "save_path": os.path.join(BASE_DIR, "recordings")
     }
-    if not os.path.exists(SETTINGS_FILE):
-        return defaults
-
-    settings = defaults.copy()
-    try:
-        with open(SETTINGS_FILE, 'r') as f:
-            for line in f:
-                if '=' in line:
-                    key, val = line.split('=', 1)
-                    settings[key.strip()] = val.strip().strip('"').strip("'")
-    except Exception as e:
-        logging.error(f"Error reading settings: {e}")
-    return settings
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            settings = defaults.copy()
+            with open(SETTINGS_FILE, 'r') as f:
+                for line in f:
+                    if '=' in line:
+                        key, val = line.split('=', 1)
+                        settings[key.strip()] = val.strip().strip('"').strip("'")
+            return settings
+        except Exception as e:
+            logging.error(f"Error reading settings: {e}")
+    return defaults
 
 
 def save_settings(new_settings):
@@ -62,17 +69,13 @@ recordings_lock = threading.Lock()
 
 
 def reload_configuration():
-    """Initializes AI Client and Recording Directory."""
     global CONFIG, ai_client
     CONFIG = get_settings()
-
-    # Storage Validation
     try:
         os.makedirs(CONFIG['save_path'], exist_ok=True)
     except Exception as e:
         logging.error(f"STORAGE ERROR: {e}")
 
-    # Initialize New Google GenAI SDK
     if CONFIG.get("api_key"):
         try:
             from google import genai
@@ -86,17 +89,8 @@ def reload_configuration():
 
 reload_configuration()
 
-# --- 3. Dual Logging Setup ---
-# Server Log: High-level app events
-server_handler = RotatingFileHandler(SERVER_LOG, maxBytes=10 * 1024 * 1024, backupCount=5)
-logging.basicConfig(
-    handlers=[server_handler],
-    level=logging.INFO,
-    format='%(asctime)s - [%(threadName)s] - %(levelname)s - %(message)s'
-)
 
-
-# --- 4. Core DVR Logic ---
+# --- 4. DVR Core Logic with Mid-Stream Recovery ---
 def ai_is_same_event(original_name, candidate_name):
     if not ai_client: return False
     prompt = f"Original: '{original_name}'. Candidate: '{candidate_name}'. Are these the same sports event? Respond ONLY 'YES' or 'NO'."
@@ -109,7 +103,7 @@ def ai_is_same_event(original_name, candidate_name):
 
 
 def record_stream(stream_url, name, duration_seconds, task_uuid, repeat, alt_name):
-    """Executes FFmpeg with verbose logging to stream_debug.log."""
+    """Records stream with automatic retry if connection drops mid-game."""
     with recordings_lock:
         active_recordings.append(name)
 
@@ -118,43 +112,61 @@ def record_stream(stream_url, name, duration_seconds, task_uuid, repeat, alt_nam
     suffix = f"_{alt_name.replace(' ', '_')}" if alt_name else ""
     filename = os.path.join(CONFIG['save_path'], f"{clean_name}{suffix}_{timestamp}.mp4")
 
-    # Command with VERBOSE logging
-    command = [
-        'ffmpeg', '-y', '-loglevel', 'verbose',
-        '-http_persistent', '0', '-ignore_unknown',
-        '-i', stream_url, '-t', str(duration_seconds),
-        '-c', 'copy', '-bsf:a', 'aac_adtstoasc', filename
-    ]
+    # Recovery variables
+    remaining_duration = duration_seconds
+    max_retries = 3
+    retry_count = 0
 
-    logging.info(f"STARTING REC: {name} (Technical logs in stream_debug.log)")
+    logging.info(f"STARTING REC: {name} (Duration: {duration_seconds}s)")
 
-    try:
-        # Redirect all FFmpeg output to the separate Stream Log
-        with open(STREAM_LOG, "a") as f_debug:
-            f_debug.write(f"\n\n--- SESSION START: {name} | {datetime.now()} ---\n")
-            f_debug.flush()
+    while remaining_duration > 30 and retry_count < max_retries:
+        start_attempt_time = time.time()
 
-            process = subprocess.Popen(command, stdout=f_debug, stderr=f_debug, text=True)
-            process.wait(timeout=duration_seconds + 600)
+        # Verbose FFmpeg command
+        command = [
+            'ffmpeg', '-y', '-loglevel', 'verbose',
+            '-http_persistent', '0', '-ignore_unknown',
+            '-i', stream_url, '-t', str(int(remaining_duration)),
+            '-c', 'copy', '-bsf:a', 'aac_adtstoasc', filename if retry_count == 0 else f"{filename}.part{retry_count}"
+        ]
 
-            if process.returncode == 0:
-                logging.info(f"COMPLETED: {name}")
-            else:
-                logging.error(f"FAILED: {name} (Check stream_debug.log, Exit Code: {process.returncode})")
+        try:
+            with open(STREAM_LOG, "a") as f_debug:
+                f_debug.write(f"\n--- ATTEMPT {retry_count + 1}: {name} | {datetime.now()} ---\n")
+                f_debug.flush()
 
-    except Exception as e:
-        logging.error(f"RUNTIME ERROR: {name} | {e}")
-    finally:
-        with recordings_lock:
-            if name in active_recordings: active_recordings.remove(name)
-        if not repeat:
-            db = load_db();
-            db = [t for t in db if t['uuid'] != task_uuid];
-            save_db(db)
-            schedule.clear(task_uuid)
+                process = subprocess.Popen(command, stdout=f_debug, stderr=f_debug, text=True)
+                process.wait(timeout=remaining_duration + 300)
+
+                if process.returncode == 0:
+                    logging.info(f"COMPLETED: {name}")
+                    break  # Success, exit loop
+                else:
+                    # Connection dropped - calculate time spent
+                    elapsed = time.time() - start_attempt_time
+                    remaining_duration -= elapsed
+                    retry_count += 1
+
+                    if remaining_duration > 30:
+                        logging.warning(
+                            f"REC DROPPED: {name}. Retrying in 30s ({retry_count}/{max_retries}). Remaining: {int(remaining_duration)}s")
+                        time.sleep(30)
+
+        except Exception as e:
+            logging.error(f"RUNTIME ERROR during {name}: {e}")
+            break
+
+    with recordings_lock:
+        if name in active_recordings: active_recordings.remove(name)
+
+    if not repeat:
+        db = load_db()
+        db = [t for t in db if t['uuid'] != task_uuid]
+        save_db(db)
+        schedule.clear(task_uuid)
 
 
-# --- (Standard DB and Schedule Utilities) ---
+# --- 5. Scheduling Utilities ---
 def load_db():
     if os.path.exists(DB_FILE):
         try:
@@ -173,6 +185,7 @@ def get_saved_files():
     files = []
     try:
         path = CONFIG['save_path']
+        if not os.path.exists(path): return []
         for entry in os.scandir(path):
             if entry.is_file() and entry.name.lower().endswith('.mp4'):
                 stats = entry.stat()
@@ -216,6 +229,7 @@ def smart_job_wrapper(target_id, duration_seconds, task_uuid, repeat, alt_name, 
                          args=(found_item['secure_url'], original_name, duration_seconds, task_uuid, repeat,
                                alt_name)).start()
     else:
+        logging.warning(f"Event {original_name} not in feed. Retrying in 5 mins.")
         reschedule_task(task_uuid, 5)
 
 
@@ -228,7 +242,6 @@ def reschedule_task(task_uuid, delay_minutes):
             save_db(db);
             schedule.clear(task_uuid);
             register_schedule(task)
-            logging.info(f"TASK SHIFT: {task['name']} pushed to {new_time}")
             break
 
 
@@ -236,6 +249,7 @@ def register_schedule(task):
     days_map = {d: getattr(schedule.every(), d) for d in
                 ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']}
     for day in task['days']:
+        day = day.lower()
         if day in days_map:
             days_map[day].at(task['time']).do(
                 smart_job_wrapper, task['id'], task['duration'], task['uuid'], task['repeat'], task.get('alt_name', ''),
@@ -250,7 +264,7 @@ def run_scheduler():
         time.sleep(1)
 
 
-# --- 5. Flask Routes ---
+# --- 6. Flask Routes ---
 @app.route('/')
 def index():
     try:
@@ -275,25 +289,22 @@ def settings_page():
     return render_template('settings.html', settings=get_settings())
 
 
-# New: Route to view logs via browser
-@app.route('/view_log/<log_type>')
-def view_log(log_type):
-    target = SERVER_LOG if log_type == 'server' else STREAM_LOG
-    try:
-        with open(target, 'r') as f:
-            content = f.readlines()[-100:]  # Show last 100 lines
-        return "<pre>" + "".join(content) + "</pre>"
-    except:
-        return "Log file not found."
-
-
 @app.route('/add', methods=['POST'])
 def add_schedule():
     hours = float(request.form.get('hours'))
+
+    # FIX: Default to today if no days selected
+    selected_days = request.form.getlist('days')
+    if not selected_days:
+        today = datetime.now().strftime('%A').lower()
+        selected_days = [today]
+        logging.info(f"Defaulting {request.form.get('stream_name')} to {today}")
+
     task = {'uuid': str(uuid.uuid4()), 'id': request.form.get('stream_id'), 'name': request.form.get('stream_name'),
             'alt_name': request.form.get('alt_name', '').strip(), 'time': request.form.get('time'),
-            'duration': int(hours * 3600), 'days': request.form.getlist('days'),
+            'duration': int(hours * 3600), 'days': selected_days,
             'repeat': True if request.form.get('repeat') else False}
+
     db = load_db();
     db.append(task);
     save_db(db);
