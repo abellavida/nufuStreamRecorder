@@ -1,0 +1,81 @@
+{% extends "layout.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card p-4 shadow" style="border: 1px solid var(--plex-orange);">
+            <h4 class="mb-4 text-center" style="color: var(--plex-orange); font-weight: 800; border-bottom: 2px solid var(--plex-orange); padding-bottom: 15px;">
+                <i class="fas fa-tools me-2"></i>SYSTEM CONFIGURATION
+            </h4>
+
+            <form method="POST">
+                <div class="mb-4">
+                    <label class="form-label fw-bold" style="color: var(--plex-orange); font-size: 0.9rem; letter-spacing: 1.5px;">
+                        PAID API PROVIDER URL
+                    </label>
+                    <input type="text" name="paid_api" class="form-control"
+                           style="border: 1px solid var(--plex-orange); background-color: #000; color: #fff;"
+                           value="{{ settings.paid_api }}" placeholder="https://nufu.tv/json/...">
+                    <div class="form-text mt-2" style="color: var(--plex-orange); opacity: 0.8; font-size: 0.75rem;">
+                        <i class="fas fa-link me-1"></i> The JSON endpoint for your IPTV/Nufu data provider.
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold" style="color: var(--plex-orange); font-size: 0.9rem; letter-spacing: 1.5px;">
+                        GOOGLE GEMINI API KEY
+                    </label>
+                    <input type="password" name="gemini_key" class="form-control"
+                           style="border: 1px solid var(--plex-orange); background-color: #000; color: #fff;"
+                           value="{{ settings.gemini_key }}" placeholder="Enter AI Key">
+                    <div class="form-text mt-2" style="color: var(--plex-orange); opacity: 0.8; font-size: 0.75rem;">
+                        <i class="fas fa-brain me-1"></i> Powers the AI Watchdog for stream verification and recovery.
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="form-label fw-bold" style="color: var(--plex-orange); font-size: 0.9rem; letter-spacing: 1.5px;">
+                        VIDEO STORAGE PATH
+                    </label>
+                    <input type="text" name="save_path" class="form-control"
+                           style="border: 1px solid var(--plex-orange); background-color: #000; color: #fff;"
+                           value="{{ settings.save_path }}" placeholder="/path/to/recordings">
+                    <div class="form-text mt-2" style="color: var(--plex-orange); opacity: 0.8; font-size: 0.75rem;">
+                        <i class="fas fa-folder-open me-1"></i> Absolute path where MP4 files will be saved.
+                    </div>
+                </div>
+
+                <div class="d-flex gap-3">
+                    <a href="/" class="btn btn-outline-secondary w-50" style="color: var(--plex-orange); border-color: var(--plex-orange);">
+                        <i class="fas fa-times me-1"></i> DISCARD
+                    </a>
+                    <button type="submit" class="btn btn-primary w-50" style="background-color: var(--plex-orange); border: none; color: #000; font-weight: bold;">
+                        <i class="fas fa-check-circle me-1"></i> APPLY SETTINGS
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="mt-4 text-center">
+            <small style="color: var(--plex-orange); text-transform: uppercase; letter-spacing: 2px; font-weight: bold; opacity: 0.6;">
+                DVR PRO v2.0 • 2026
+            </small>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Ensure focused inputs keep the plex-orange border */
+    .form-control:focus {
+        background-color: #000 !important;
+        color: #fff !important;
+        border-color: var(--plex-orange) !important;
+        box-shadow: 0 0 8px rgba(229, 160, 13, 0.5) !important;
+    }
+    /* Placeholder color */
+    .form-control::placeholder {
+        color: rgba(229, 160, 13, 0.4) !important;
+    }
+</style>
+{% endblock %}

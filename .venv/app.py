@@ -3,169 +3,260 @@ import json
 import requests
 import os
 import time
-import logging
 import threading
 import uuid
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for
-from logging.handlers import RotatingFileHandler
 import schedule
-
-# --- 1. Configuration ---
-JSON_API_URL = "https://nufu.tv/json/jcarter@abellavida.com"
-SAVE_FOLDER = "/home/jc3/Videos/Recordings"
-DB_FILE = "schedules.json"
-LOG_PATH = "/home/jc3/Videos/dvr_app.log"
-
-os.makedirs(SAVE_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 
-# --- 2. Logging ---
-log_handler = RotatingFileHandler(LOG_PATH, maxBytes=5 * 1024 * 1024, backupCount=5)
-logging.basicConfig(handlers=[log_handler], level=logging.INFO,
-                    format='%(asctime)s - [%(threadName)s] - %(levelname)s - %(message)s')
+# --- 1. Configuration & Persistence ---
+DB_FILE = "schedules.json"
+SETTINGS_FILE = "settings.json"
+DEFAULT_SETTINGS = {
+    "paid_api": "https://nufu.tv/json/jcarter@abellavida.com",
+    "gemini_key": "",
+    "save_path": "/home/jc-media/Videos/Recordings"
+}
 
-active_recordings = []
-recordings_lock = threading.Lock()
+
+def load_settings():
+    """Loads configuration dictionary from disk."""
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, 'r') as f:
+                return {**DEFAULT_SETTINGS, **json.load(f)}
+        except:
+            return DEFAULT_SETTINGS
+    return DEFAULT_SETTINGS
 
 
-# --- 3. Helpers ---
-def load_db():
+def load_schedules():
+    """Loads scheduled tasks list from disk."""
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                return data if isinstance(data, list) else []
         except:
             return []
     return []
 
 
-def save_db(data):
-    with open(DB_FILE, 'w') as f: json.dump(data, f, indent=4)
+def save_json(path, data):
+    """Saves data to a JSON file."""
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=4)
 
 
-def get_saved_files():
-    files = []
-    target_path = os.path.abspath(os.path.expanduser(SAVE_FOLDER))
-    if not os.path.exists(target_path): return []
-    try:
-        for entry in os.scandir(target_path):
-            if entry.is_file() and entry.name.lower().endswith('.mp4'):
-                stats = entry.stat()
-                files.append({
-                    'name': entry.name,
-                    'size': f"{stats.st_size / (1024 * 1024):.2f} MB",
-                    'date': datetime.fromtimestamp(stats.st_mtime).strftime('%Y-%m-%d %H:%M'),
-                    'raw_time': stats.st_mtime
-                })
-        return sorted(files, key=lambda x: x['raw_time'], reverse=True)
-    except:
-        return []
+# Global State
+settings = load_settings()
+active_recordings = {}
+recordings_lock = threading.Lock()
 
 
-# --- 4. Recording Logic ---
-def record_stream(stream_url, name, duration_seconds, task_uuid, repeat, alt_name):
-    with recordings_lock:
-        active_recordings.append(name)
+# --- 2. Recording Engine ---
+def record_stream(stream_url, name, duration, task_uuid, custom_prefix=""):
+    """
+    Executes the FFmpeg recording process.
+    - custom_prefix: Prepends user text to the filename if provided.
+    - task_uuid: Used to track the process in the 'Active Recordings' UI.
+    """
+    # 1. Prepare Paths
+    save_path = os.path.abspath(os.path.expanduser(settings['save_path']))
+    os.makedirs(save_path, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # Naming Logic: Channel_AltName_Timestamp or Channel_Timestamp
+    # 2. Format Filename (Prefix + Name + Timestamp)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     clean_name = name.replace(' ', '_').replace('/', '-')
-    suffix = f"_{alt_name.replace(' ', '_')}" if alt_name else ""
-    filename = os.path.join(SAVE_FOLDER, f"{clean_name}{suffix}_{timestamp}.mp4")
 
-    logging.info(f"STARTING: {name} (Alt: {alt_name})")
+    # Prepend prefix if it exists, otherwise just use the name
+    prefix_str = f"{custom_prefix.strip()}_" if custom_prefix.strip() else ""
+    filename = os.path.join(save_path, f"{prefix_str}{clean_name}_{timestamp}.mp4")
 
-    command = ['ffmpeg', '-y', '-i', stream_url, '-t', str(duration_seconds), '-c', 'copy', '-bsf:a', 'aac_adtstoasc',
-               filename]
+    # 3. Define FFmpeg Command
+    # Flags explained:
+    # -reconnect: Force reconnect on disconnect
+    # -reconnect_streamed: Keep trying if the source is a stream
+    # -t: Limit recording to the scheduled duration (in seconds)
+    # -c copy: Do not re-encode (saves CPU, keeps original quality)
+    cmd = [
+        'ffmpeg', '-y',
+        '-reconnect', '1',
+        '-reconnect_at_eof', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
+        '-i', stream_url,
+        '-t', str(duration),
+        '-c', 'copy',
+        '-bsf:a', 'aac_adtstoasc',
+        filename
+    ]
+
+    start_timestamp = datetime.now().strftime("%I:%M %p")
 
     try:
-        subprocess.run(command, capture_output=True, text=True, check=True, timeout=duration_seconds + 120)
-    except Exception as e:
-        logging.error(f"FFMPEG ERROR on {name}: {e}")
-    finally:
+        # 4. Launch FFmpeg Process
+        # stdout/stderr are piped to DEVNULL to keep your console clean,
+        # but you can pipe to subprocess.PIPE if you need to debug.
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+        # 5. Register in Global State for the "Live" UI
         with recordings_lock:
-            if name in active_recordings: active_recordings.remove(name)
-        if not repeat:
-            db = load_db()
-            db = [t for t in db if t['uuid'] != task_uuid]
-            save_db(db)
-            schedule.clear(task_uuid)
+            active_recordings[task_uuid] = {
+                "name": name,
+                "proc": proc,
+                "start": start_timestamp
+            }
 
+        print(f"🔴 RECORDING STARTED: {filename}")
 
-def job_wrapper(target_id, duration_seconds, task_uuid, repeat, alt_name):
-    try:
-        data = requests.get(JSON_API_URL, timeout=10).json()
-        for key in data:
-            if isinstance(data[key], list):
-                for item in data[key]:
-                    if str(item.get('channel_id')) == target_id or str(item.get('fixture_id')) == target_id:
-                        url = item.get('secure_url')
-                        name = item.get('channel_name') or item.get('fixture_name')
-                        threading.Thread(target=record_stream,
-                                         args=(url, name, duration_seconds, task_uuid, repeat, alt_name)).start()
-                        return
+        # 6. Wait for recording to complete
+        proc.wait()
+
     except Exception as e:
-        logging.error(f"Job Wrapper Error: {e}")
+        print(f"❌ ERROR DURING RECORDING ({name}): {e}")
+
+    finally:
+        # 7. Cleanup: Remove from Active Recordings regardless of success/fail
+        with recordings_lock:
+            active_recordings.pop(task_uuid, None)
+        print(f"🏁 RECORDING FINISHED: {name}")
 
 
-def register_schedule(task):
-    days_map = {d: getattr(schedule.every(), d) for d in
-                ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']}
-    for day in task['days']:
-        if day in days_map:
-            days_map[day].at(task['time']).do(job_wrapper, task['id'], task['duration'], task['uuid'], task['repeat'],
-                                              task.get('alt_name', '')).tag(task['uuid'])
+def job_wrapper(task):
+    """Fetches a fresh URL from the API right before recording starts."""
+    try:
+        r = requests.get(settings['paid_api'], timeout=10).json()
+        target_id = str(task['id'])
+        found_url = None
+
+        for cat in r:
+            if isinstance(r[cat], list):
+                for item in r[cat]:
+                    if str(item.get('channel_id')) == target_id or str(item.get('fixture_id')) == target_id:
+                        found_url = item.get('secure_url')
+                        break
+
+        if found_url:
+            threading.Thread(target=record_stream,
+                             args=(found_url, task['name'], task['duration'], task['uuid'])).start()
+    except Exception as e:
+        print(f"Job Launcher Error: {e}")
 
 
-def run_scheduler():
-    for task in load_db(): register_schedule(task)
+# --- 3. Scheduler Management ---
+def register_all_tasks():
+    """Syncs the background schedule with the JSON database."""
+    schedule.clear()
+    tasks = load_schedules()
+
+    day_map = {
+        'mon': 'monday', 'tue': 'tuesday', 'wed': 'wednesday',
+        'thu': 'thursday', 'fri': 'friday', 'sat': 'saturday', 'sun': 'sunday'
+    }
+
+    for t in tasks:
+        for day_short in t.get('days', []):
+            day_method = day_map.get(day_short.lower())
+            if day_method:
+                # Dynamically call e.g., schedule.every().monday.at("HH:MM").do(...)
+                getattr(schedule.every(), day_method).at(t['time']).do(job_wrapper, t).tag(t['uuid'])
+
+    print(f"📅 Scheduler Synced: {len(tasks)} tasks active.")
+
+
+def run_scheduler_loop():
+    """Background thread to process pending jobs."""
+    register_all_tasks()
     while True:
         schedule.run_pending()
-        time.sleep(1)
+        time.sleep(5)
 
 
-# --- 5. Routes ---
+# --- 4. Web Routes ---
 @app.route('/')
 def index():
-    try:
-        api_data = requests.get(JSON_API_URL, timeout=5).json()
-    except:
-        api_data = {}
-    return render_template('index.html', data=api_data, schedules=load_db(), active=active_recordings,
-                           files=get_saved_files())
+    global settings
+    settings = load_settings()
+    # ... (API loading logic) ...
+
+    files = []
+    save_path = os.path.abspath(os.path.expanduser(settings['save_path']))
+    if os.path.exists(save_path):
+        for f in os.listdir(save_path):
+            if f.endswith('.mp4'):
+                p = os.path.join(save_path, f)
+                stat = os.stat(p)
+                # Calculate duration based on size (Assumes ~3Mbps average bitrate for IPTV)
+                # Formula: (Size in bytes * 8) / Bitrate_bps / 60 = Minutes
+                approx_mins = (stat.st_size * 8) / (3000000) / 60
+                duration_str = f"{int(approx_mins)} MIN" if approx_mins > 1 else "< 1 MIN"
+
+                dt = datetime.fromtimestamp(stat.st_mtime)
+                files.append({
+                    'name': f,
+                    'size': f"{stat.st_size // (1024 * 1024)} MB",
+                    'date': dt.strftime('%b %d, %Y').upper(),
+                    'time_created': dt.strftime('%I:%M %p'),
+                    'duration': duration_str  # Real-world approximation
+                })
+        files.sort(key=lambda x: os.path.getmtime(os.path.join(save_path, x['name'])), reverse=True)
+
+    return render_template('index.html', data=api_data, settings=settings,
+                           schedules=load_schedules(), active=active_recordings.values(), files=files)
 
 
+# --- Updated Route to handle Custom Name ---
 @app.route('/add', methods=['POST'])
-def add_schedule():
-    hours = float(request.form.get('hours'))
+def add():
+    db = load_schedules()
+    selected_days = request.form.getlist('days')
+    if not selected_days:
+        selected_days = [datetime.now().strftime('%a').lower()]
+
     task = {
         'uuid': str(uuid.uuid4()),
         'id': request.form.get('stream_id'),
         'name': request.form.get('stream_name'),
-        'alt_name': request.form.get('alt_name', '').strip(),
+        'custom_prefix': request.form.get('custom_prefix', '').strip(),  # New Field
         'time': request.form.get('time'),
-        'duration': int(hours * 3600),
-        'days': request.form.getlist('days'),
-        'repeat': True if request.form.get('repeat') else False
+        'duration_seconds': int(float(request.form.get('hours', 1)) * 3600),
+        'duration_display': f"{request.form.get('hours')} HRS",  # Stored for the UI
+        'days': selected_days
     }
-    db = load_db()
+
     db.append(task)
-    save_db(db)
-    register_schedule(task)
-    return redirect(url_for('index'))
+    save_json(DB_FILE, db)
+    register_all_tasks()
+    return redirect('/')
 
 
-@app.route('/delete/<task_uuid>')
-def delete(task_uuid):
-    db = load_db()
-    db = [t for t in db if t['uuid'] != task_uuid]
-    save_db(db)
-    schedule.clear(task_uuid)
-    return redirect(url_for('index'))
+@app.route('/delete/<uid>')
+def delete(uid):
+    db = [t for t in load_schedules() if t['uuid'] != uid]
+    save_json(DB_FILE, db)
+    schedule.clear(uid)
+    return redirect('/')
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings_page():
+    global settings
+    if request.method == 'POST':
+        settings.update({
+            'paid_api': request.form.get('paid_api'),
+            'gemini_key': request.form.get('gemini_key'),
+            'save_path': request.form.get('save_path')
+        })
+        save_json(SETTINGS_FILE, settings)
+        return redirect('/')
+    return render_template('settings.html', settings=load_settings())
 
 
 if __name__ == '__main__':
-    threading.Thread(target=run_scheduler, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Start the background clock
+    threading.Thread(target=run_scheduler_loop, daemon=True).start()
+    # use_reloader=False is critical to prevent the background thread from running twice
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
