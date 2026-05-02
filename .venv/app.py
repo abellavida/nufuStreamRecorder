@@ -68,6 +68,7 @@ recordings_lock = threading.Lock()
 
 
 # --- 2. Recording Engine ---
+# Added Logging Info back
 def record_stream(stream_url, name, duration, task_uuid, custom_prefix=""):
     save_path = os.path.abspath(os.path.expanduser(settings['save_path']))
     os.makedirs(save_path, exist_ok=True)
