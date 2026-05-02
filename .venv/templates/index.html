@@ -3,91 +3,35 @@
 
 {% block content %}
 <style>
-    /* Global Plex UI Variables */
-    :root {
-        --plex-orange: #e5a00d;
-        --plex-black: #121517;
-    }
+    :root { --plex-orange: #e5a00d; --plex-black: #121517; }
 
-    /* Placeholder Visibility Fix
-       Targets all browsers to ensure "Plex Orange" instructions
-    */
-    input::placeholder {
-        color: var(--plex-orange) !important;
-        opacity: 0.7 !important;
-        font-weight: 500;
-        letter-spacing: 0.5px;
-    }
+    /* Input & Placeholder Fixes */
+    .form-control { color: #fff !important; background: #000 !important; border: 1px solid var(--plex-orange) !important; }
+    input::placeholder { color: var(--plex-orange) !important; opacity: 0.7 !important; font-weight: normal; }
+    input::-webkit-input-placeholder { color: var(--plex-orange) !important; }
 
-    /* Chrome, Safari, Edge */
-    input::-webkit-input-placeholder {
-        color: var(--plex-orange) !important;
-    }
-
-    /* Firefox */
-    input::-moz-placeholder {
-        color: var(--plex-orange) !important;
-        opacity: 0.7;
-    }
-
-    /* IE/Edge Legacy */
-    input:-ms-input-placeholder {
-        color: var(--plex-orange) !important;
-    }
-
-    /* Styling for the specific Custom Prefix placeholder to make it look like a hint */
-    input[name="custom_prefix"]::placeholder {
-        font-style: italic;
-        font-size: 0.85rem;
-    }
-
-    /* Ensure active typed text is white for contrast */
-    .form-control {
-        color: #FFFFFF !important;
-    }
-
-    /* Focus state: brighten the border and glow slightly when selected */
-    .form-control:focus {
-        background-color: #000 !important;
-        border-color: var(--plex-orange) !important;
-        box-shadow: 0 0 0 0.25rem rgba(229, 160, 13, 0.25) !important;
-    }
-
-    /* Table & Animation logic */
     .file-item:hover { background-color: rgba(229, 160, 13, 0.1) !important; transition: 0.2s; }
     @keyframes blinker { 50% { opacity: 0.2; } }
-    .btn-check:checked + .btn-outline-warning {
-        background-color: var(--plex-orange) !important;
-        color: #000 !important;
-    }
+    .btn-check:checked + .btn-outline-warning { background-color: var(--plex-orange) !important; color: #000 !important; }
 </style>
 
 <div class="row">
     <div class="col-lg-3">
         <div class="card p-3 shadow-sm mb-4" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
-            <h5 class="card-title" style="color: var(--plex-orange); font-weight: 800; letter-spacing: 1px;">
-                <i class="fas fa-calendar-plus me-2"></i>NEW SCHEDULE
-            </h5>
+            <h5 style="color: var(--plex-orange); font-weight: 800;"><i class="fas fa-calendar-plus me-2"></i>NEW SCHEDULE</h5>
             <form action="/add" method="post">
                 <input type="hidden" name="stream_name" id="stream_name">
+                <input type="text" id="streamSearch" class="form-control form-control-sm mb-2" placeholder="🔍 FILTER CHANNELS...">
 
-                <div class="mb-3">
-                    <input type="text" id="streamSearch" class="form-control form-control-sm"
-                           style="border: 2px solid var(--plex-orange); background: #000; color: var(--plex-orange); font-weight: bold;"
-                           placeholder="🔍 FILTER CHANNELS...">
-                </div>
-
-                <select name="stream_id" id="streamSelect" class="form-select mb-3"
-                        style="border: 1px solid var(--plex-orange); background: #000; color: #fff;"
-                        onchange="document.getElementById('stream_name').value=this.options[this.selectedIndex].text" required>
+                <select name="stream_id" id="streamSelect" class="form-select mb-3" onchange="document.getElementById('stream_name').value=this.options[this.selectedIndex].text" required>
                     <option value="">-- SELECT STREAM --</option>
                     {% for cat, items in data.items() if items is iterable %}
                         {% if 'REPLAY' not in cat|upper %}
-                        <optgroup label="{{ cat|upper }}" style="color: var(--plex-orange); background: #121517;">
+                        <optgroup label="{{ cat|upper }}" style="color: var(--plex-orange);">
                             {% for item in items %}
                                 {% set item_name = item.channel_name or item.fixture_name %}
                                 {% if 'REPLAY' not in item_name|upper %}
-                                <option value="{{ item.channel_id or item.fixture_id }}" style="color: #fff;">{{ item_name }}</option>
+                                <option value="{{ item.channel_id or item.fixture_id }}">{{ item_name }}</option>
                                 {% endif %}
                             {% endfor %}
                         </optgroup>
@@ -96,20 +40,18 @@
                 </select>
 
                 <div class="mb-3">
-                    <label class="fw-bold" style="color: var(--plex-orange); font-size: 0.75rem; letter-spacing: 1px;">CUSTOM FILE PREFIX</label>
-                    <input type="text" name="custom_prefix" class="form-control"
-                           style="border: 1px solid var(--plex-orange); background: #000; color: #fff;"
-                           placeholder="e.g. UFC_299_">
+                    <label class="fw-bold" style="color: var(--plex-orange); font-size: 0.75rem;">CUSTOM FILE PREFIX</label>
+                    <input type="text" name="custom_prefix" class="form-control" placeholder="e.g. UFC_299_">
                 </div>
 
                 <div class="row g-2 mb-3">
                     <div class="col-6">
-                        <label class="fw-bold" style="color: var(--plex-orange); font-size: 0.75rem;">START TIME</label>
-                        <input type="time" name="time" class="form-control" style="border: 1px solid var(--plex-orange); background: #000; color: #fff;" required>
+                        <label class="fw-bold" style="color: var(--plex-orange); font-size: 0.75rem;">START</label>
+                        <input type="time" name="time" class="form-control" required>
                     </div>
                     <div class="col-6">
-                        <label class="fw-bold" style="color: var(--plex-orange); font-size: 0.75rem;">HRS (0.1+)</label>
-                        <input type="number" step="0.1" min="0.1" name="hours" class="form-control" style="border: 1px solid var(--plex-orange); background: #000; color: #fff;" value="1.0" required>
+                        <label class="fw-bold" style="color: var(--plex-orange); font-size: 0.75rem;">HRS</label>
+                        <input type="number" step="0.1" name="hours" class="form-control" value="1.0" required>
                     </div>
                 </div>
 
@@ -118,156 +60,86 @@
                     <div class="btn-group w-100 flex-wrap" role="group">
                         {% for day in ['mon','tue','wed','thu','fri','sat','sun'] %}
                         <input type="checkbox" class="btn-check" name="days" value="{{ day }}" id="d_{{ day }}">
-                        <label class="btn btn-outline-warning btn-sm" for="d_{{ day }}" style="font-weight: bold; border-color: var(--plex-orange);">{{ day[:1]|upper }}</label>
+                        <label class="btn btn-outline-warning btn-sm" for="d_{{ day }}">{{ day[:1]|upper }}</label>
                         {% endfor %}
                     </div>
                     <div class="mt-2" style="color: var(--plex-orange); font-size: 0.65rem; opacity: 0.8; font-style: italic;">
-                        <i class="fas fa-info-circle me-1"></i> DEFAULTS TO TODAY IF BLANK
+                        <i class="fas fa-info-circle me-1"></i> LEAVE BLANK FOR ONE-TIME (TODAY)
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary w-100" style="background: var(--plex-orange); border: none; color: #000; font-weight: 800;">
-                    ADD TO RECORDER
-                </button>
+                <button type="submit" class="btn btn-primary w-100" style="background: var(--plex-orange); border: none; color: #000; font-weight: 800;">ADD RECORDING</button>
             </form>
         </div>
     </div>
 
     <div class="col-lg-9">
-
         {% if active %}
         <div class="card p-3 mb-4" style="border: 2px solid #ff0000; background-color: var(--plex-black);">
-            <h5 class="card-title" style="color: #ff0000; font-weight: 800; letter-spacing: 1px;">
-                <i class="fas fa-record-vinyl fa-spin me-2"></i> LIVE RECORDINGS
-            </h5>
-            <div class="table-responsive">
-                <table class="table table-dark align-middle mb-0">
-                    <thead class="x-small" style="color: #ff0000; border-bottom: 2px solid #ff0000;">
-                        <tr>
-                            <th style="width: 45%;">STREAM NAME</th>
-                            <th>STARTED AT</th>
-                            <th>STATUS</th>
-                            <th class="text-end">SIGNAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for rec in active %}
-                        <tr style="border-bottom: 1px solid #440000;">
-                            <td style="color: #fff; font-weight: 700;">{{ rec.name }}</td>
-                            <td style="color: #ff0000; font-weight: 600;">{{ rec.start }}</td>
-                            <td>
-                                <span class="badge" style="background: #ff0000; color: #fff; font-weight: 900; animation: blinker 1.5s linear infinite; padding: 5px 10px;">
-                                    RECORDING
-                                </span>
-                            </td>
-                            <td class="text-end"><i class="fas fa-signal" style="color: #ff0000;"></i></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <h5 style="color: #ff0000; font-weight: 800;"><i class="fas fa-record-vinyl fa-spin me-2"></i> LIVE RECORDINGS</h5>
+            <table class="table table-dark align-middle mb-0">
+                <thead style="color: #ff0000; font-size: 0.7rem; border-bottom: 2px solid #ff0000;">
+                    <tr><th style="width: 45%;">NAME</th><th>STARTED</th><th>STATUS</th><th class="text-end">SIGNAL</th></tr>
+                </thead>
+                <tbody>
+                    {% for rec in active %}
+                    <tr><td class="fw-bold">{{ rec.name }}</td><td style="color: #ff0000;">{{ rec.start }}</td>
+                        <td><span class="badge" style="background: #ff0000; animation: blinker 1.5s infinite;">RECORDING</span></td>
+                        <td class="text-end"><i class="fas fa-signal" style="color: #ff0000;"></i></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         {% endif %}
 
         <div class="card p-3 mb-4" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
-            <h5 class="card-title" style="color: var(--plex-orange); font-weight: 800; letter-spacing: 1px;">📅 UPCOMING SCHEDULES</h5>
-            <div class="table-responsive">
-                <table class="table table-dark table-hover align-middle mb-0">
-                    <thead class="x-small" style="color: var(--plex-orange); border-bottom: 2px solid var(--plex-orange);">
-                        <tr>
-                            <th style="width: 45%;">STREAM NAME</th>
-                            <th>TIME</th>
-                            <th>DAYS</th>
-                            <th class="text-end">ACTION</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for s in schedules %}
-                        <tr style="border-bottom: 1px solid #333;">
-                            <td style="color: #fff; font-weight: 700;">{{ s.name }}</td>
-                            <td><span class="badge" style="background: var(--plex-orange); color: #000; font-weight: bold;">{{ s.time }}</span></td>
-                            <td style="color: var(--plex-orange); font-weight: 600; font-size: 0.8rem;">{{ s.days|join(', ')|upper }}</td>
-                            <td class="text-end">
-                                <a href="/delete/{{ s.uuid }}" class="btn btn-sm text-danger"><i class="fas fa-trash-alt"></i></a>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="4" class="text-center py-4" style="color: var(--plex-orange);">NO SCHEDULED TASKS</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <h5 style="color: var(--plex-orange); font-weight: 800;">📅 UPCOMING SCHEDULES</h5>
+            <table class="table table-dark align-middle mb-0">
+                <thead style="color: var(--plex-orange); font-size: 0.7rem; border-bottom: 2px solid var(--plex-orange);">
+                    <tr><th style="width: 45%;">STREAM</th><th>TIME</th><th>DAYS</th><th class="text-end">ACTION</th></tr>
+                </thead>
+                <tbody>
+                    {% for s in schedules %}
+                    <tr><td class="fw-bold text-white">{{ s.name }}</td><td><span class="badge" style="background: var(--plex-orange); color: #000;">{{ s.time }}</span></td>
+                        <td style="color: var(--plex-orange); font-size: 0.8rem;">{{ s.days|join(', ')|upper }}</td>
+                        <td class="text-end"><a href="/delete/{{ s.uuid }}" class="btn btn-sm text-danger"><i class="fas fa-trash-alt"></i></a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
 
         <div class="card p-3" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
             <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2" style="border-color: var(--plex-orange) !important;">
-                <h5 class="m-0" style="color: var(--plex-orange); font-weight: 800; letter-spacing: 1px;">📁 RECORDING LIBRARY</h5>
-                <div class="w-25">
-                    <input type="text" id="fileSearch" class="form-control form-control-sm"
-                           style="border: 2px solid var(--plex-orange); background: #000; color: var(--plex-orange); font-weight: bold;"
-                           placeholder="SEARCH LIBRARY...">
-                </div>
+                <h5 class="m-0" style="color: var(--plex-orange); font-weight: 800;">📁 RECORDING LIBRARY</h5>
+                <input type="text" id="fileSearch" class="form-control form-control-sm w-25" placeholder="SEARCH...">
             </div>
-
-            <div class="table-responsive">
-                <table class="table table-dark table-hover align-middle mb-0">
-                    <thead class="x-small" style="color: var(--plex-orange); border-bottom: 2px solid var(--plex-orange);">
-                        <tr>
-                            <th style="width: 45%;">FILENAME</th>
-                            <th>DATE & TIME</th>
-                            <th>DURATION</th>
-                            <th class="text-end">SIZE</th>
-                        </tr>
-                    </thead>
-                    <tbody id="fileList">
-                        {% for f in files %}
-                        <tr class="file-item" style="border-bottom: 1px solid #333;">
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <a href="http://localhost:32400/web/index.html#!/" target="_blank" style="text-decoration: none;">
-                                        <i class="fas fa-play-circle me-3" style="color: var(--plex-orange); font-size: 1.3rem; cursor: pointer;"></i>
-                                    </a>
-                                    <span style="color: #FFFFFF; font-weight: 700;">{{ f.name }}</span>
-                                </div>
-                            </td>
-                            <td style="color: var(--plex-orange); font-weight: 600;">
-                                <div class="d-flex flex-column">
-                                    <span><i class="far fa-calendar-alt me-1"></i> {{ f.date }}</span>
-                                    <span><i class="far fa-clock me-1"></i> {{ f.time_created }}</span>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge" style="background: var(--plex-orange); color: #000; font-weight: 900; padding: 5px 10px;">{{ f.duration }}</span>
-                            </td>
-                            <td class="text-end" style="color: #FFFFFF; font-weight: 600;">{{ f.size }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="4" class="text-center py-5" style="color: var(--plex-orange);">NO RECORDINGS FOUND</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead style="color: var(--plex-orange); font-size: 0.7rem; border-bottom: 2px solid var(--plex-orange);">
+                    <tr><th style="width: 45%;">FILENAME</th><th>DATE</th><th>DURATION</th><th class="text-end">SIZE</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in files %}
+                    <tr class="file-item">
+                        <td><a href="http://localhost:32400/web/index.html#!/" target="_blank"><i class="fas fa-play-circle me-3" style="color: var(--plex-orange); font-size: 1.2rem;"></i></a><span class="text-white fw-bold">{{ f.name }}</span></td>
+                        <td style="color: var(--plex-orange);">{{ f.date }}<br><small>{{ f.time_created }}</small></td>
+                        <td><span class="badge" style="background: var(--plex-orange); color: #000;">{{ f.duration }}</span></td>
+                        <td class="text-end text-white">{{ f.size }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
 <script>
-    // Channel Search
     document.getElementById('streamSearch').addEventListener('keyup', function() {
-        let filter = this.value.toLowerCase();
-        let options = document.getElementById('streamSelect').options;
-        for (let i = 0; i < options.length; i++) {
-            if (options[i].value !== "") {
-                options[i].style.display = options[i].text.toLowerCase().includes(filter) ? "" : "none";
-            }
-        }
+        let f = this.value.toLowerCase();
+        let ops = document.getElementById('streamSelect').options;
+        for (let i=0; i<ops.length; i++) if (ops[i].value !== "") ops[i].style.display = ops[i].text.toLowerCase().includes(f) ? "" : "none";
     });
-
-    // Library Search
     document.getElementById('fileSearch').addEventListener('keyup', function() {
-        let filter = this.value.toLowerCase();
-        document.querySelectorAll('.file-item').forEach(row => {
-            row.style.display = row.innerText.toLowerCase().includes(filter) ? "" : "none";
-        });
+        let f = this.value.toLowerCase();
+        document.querySelectorAll('.file-item').forEach(r => r.style.display = r.innerText.toLowerCase().includes(f) ? "" : "none");
     });
 </script>
 {% endblock %}
