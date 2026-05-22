@@ -9,6 +9,8 @@ import logging  # Added back
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for
 import schedule
+from flask import jsonify
+import jellyfin_client as jf
 
 app = Flask(__name__)
 
@@ -20,6 +22,8 @@ DEFAULT_SETTINGS = {
     "gemini_key": "",
     "save_path": "/home/jc-media/Videos/Recordings"
 }
+JELLYFIN_CONFIG_FILE = "jellyfin_config.json"
+DEFAULT_JELLYFIN_CONFIG = {"api_key": "7a57a0a863574322a3b490a9b29169d3", "save_path": "/home/jc-media/Videos/IPTV"}
 
 # --- LOGGING SETUP ---
 logging.basicConfig(
@@ -44,6 +48,14 @@ def load_settings():
             return DEFAULT_SETTINGS
     return DEFAULT_SETTINGS
 
+def load_jf_config():
+          if os.path.exists(JELLYFIN_CONFIG_FILE):
+              try:
+                  with open(JELLYFIN_CONFIG_FILE) as f:
+                      return {**DEFAULT_JELLYFIN_CONFIG, **json.load(f)}
+              except:
+                  pass
+          return DEFAULT_JELLYFIN_CONFIG.copy()
 
 def load_schedules():
     if os.path.exists(DB_FILE):
@@ -279,8 +291,104 @@ def settings_page():
     return render_template('settings.html', settings=load_settings())
 
 
+@app.route('/iptv')
+def iptv():
+    cfg = load_jf_config()
+    api_key = cfg.get("api_key", "")
+
+    channels = jf.get_channels(api_key) if api_key else []
+    timers = jf.get_timers(api_key) if api_key else []
+    recordings = jf.get_recordings(api_key) if api_key else []
+
+    # Humanise timer dates for the template
+    from datetime import timezone
+    for t in timers:
+        try:
+            dt = datetime.fromisoformat(t["start_date"].replace("Z", "+00:00"))
+            t["start_display"] = dt.astimezone().strftime("%b %d %Y  %I:%M %p")
+        except Exception:
+            t["start_display"] = t["start_date"]
+
+    for r in recordings:
+        try:
+            dt = datetime.fromisoformat(r["start_date"].replace("Z", "+00:00"))
+            r["start_display"] = dt.astimezone().strftime("%b %d %Y  %I:%M %p")
+        except Exception:
+            r["start_display"] = r["start_date"]
+
+    with recordings_lock:
+        active = list(active_recordings.values())
+
+    return render_template(
+        'iptv.html',
+        cfg=cfg,
+        channels=channels,
+        timers=timers,
+        recordings=recordings,
+        active=active,
+        connected=bool(api_key),
+    )
+
+
+@app.route('/iptv/save_config', methods=['POST'])
+def iptv_save_config():
+    cfg = {
+        "api_key": request.form.get("api_key", "").strip(),
+        "save_path": request.form.get("save_path", "").strip(),
+    }
+    save_json(JELLYFIN_CONFIG_FILE, cfg)
+    return redirect('/iptv')
+
+
+@app.route('/iptv/test_connection')
+def iptv_test_connection():
+    cfg = load_jf_config()
+    ok, msg = jf.test_connection(cfg.get("api_key", ""))
+    return jsonify({"ok": ok, "message": msg})
+
+
+@app.route('/api/jellyfin/channels')
+def api_jf_channels():
+    cfg = load_jf_config()
+    return jsonify(jf.get_channels(cfg.get("api_key", "")))
+
+
+@app.route('/api/jellyfin/timers', methods=['GET'])
+def api_jf_timers_get():
+    cfg = load_jf_config()
+    return jsonify(jf.get_timers(cfg.get("api_key", "")))
+
+
+@app.route('/api/jellyfin/timers', methods=['POST'])
+def api_jf_timers_post():
+    cfg = load_jf_config()
+    data = request.get_json()
+    ok, msg = jf.create_timer(
+        api_key=cfg.get("api_key", ""),
+        channel_id=data.get("channel_id"),
+        start_iso=data.get("start_iso"),
+        duration_seconds=int(data.get("duration_seconds", 3600)),
+        name=data.get("name", ""),
+    )
+    return jsonify({"ok": ok, "message": msg})
+
+
+@app.route('/api/jellyfin/timers/<timer_id>', methods=['DELETE'])
+def api_jf_timers_delete(timer_id):
+    cfg = load_jf_config()
+    ok, msg = jf.delete_timer(cfg.get("api_key", ""), timer_id)
+    return jsonify({"ok": ok, "message": msg})
+
+
+@app.route('/api/jellyfin/recordings/<recording_id>', methods=['DELETE'])
+def api_jf_recordings_delete(recording_id):
+    cfg = load_jf_config()
+    ok, msg = jf.delete_recording(cfg.get("api_key", ""), recording_id)
+    return jsonify({"ok": ok, "message": msg})
+
+
 if __name__ == '__main__':
     threading.Thread(target=run_scheduler_loop, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=4999, debug=True, use_reloader=False)
 
 # Update 5.15.2026

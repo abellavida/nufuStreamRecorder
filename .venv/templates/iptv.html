@@ -1,0 +1,522 @@
+{% extends "layout.html" %}
+{% block title %}IPTV Recorder{% endblock %}
+
+{% block content %}
+<style>
+    :root { --plex-orange: #e5a00d; --plex-black: #121517; --plex-dark: #1f2326; }
+
+    .form-control, .form-select {
+        color: #fff !important;
+        background: #000 !important;
+        border: 1px solid var(--plex-orange) !important;
+    }
+    input::placeholder { color: var(--plex-orange) !important; opacity: 0.7 !important; }
+    .file-item:hover { background-color: rgba(229,160,13,0.08) !important; transition: 0.2s; }
+    @keyframes blinker { 50% { opacity: 0.2; } }
+    .btn-check:checked + .btn-outline-warning {
+        background-color: var(--plex-orange) !important;
+        color: #000 !important;
+    }
+
+    /* Connection badge */
+    .conn-badge-ok  { background: #198754; }
+    .conn-badge-err { background: #dc3545; }
+
+    /* API key field masked */
+    #api_key_field { letter-spacing: 0.08em; }
+
+    /* Channel list in sidebar */
+    .channel-row {
+        cursor: pointer;
+        padding: 6px 10px;
+        border-radius: 4px;
+        transition: background 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .channel-row:hover { background: rgba(229,160,13,0.12); }
+    .channel-row.selected { background: rgba(229,160,13,0.22); border-left: 3px solid var(--plex-orange); }
+    .channel-num { color: var(--plex-orange); font-size: 0.7rem; min-width: 28px; font-weight: 700; }
+    .channel-icon { width: 28px; height: 28px; object-fit: contain; border-radius: 3px; background: #1a1d20; }
+    .channel-icon-placeholder { width: 28px; height: 28px; background: #2a2d30; border-radius: 3px; display:flex; align-items:center; justify-content:center; }
+    .ch-list-wrap { max-height: 420px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--plex-orange) #1a1d20; }
+
+    /* Toast */
+    #toast-box { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }
+    .toast-msg { padding: 10px 18px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;
+                 color: #000; margin-top: 8px; animation: slideUp 0.3s ease; }
+    .toast-ok  { background: #e5a00d; }
+    .toast-err { background: #dc3545; color: #fff; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+
+    /* Spinner */
+    .spin { animation: spin 1s linear infinite; display:inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Nav active for IPTV link */
+    .nav-link.iptv-active { color: var(--plex-orange) !important; }
+</style>
+
+<!-- Page header -->
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h4 class="m-0" style="color: var(--plex-orange); font-weight: 800; letter-spacing:1px;">
+        <i class="fas fa-satellite-dish me-2"></i>IPTV RECORDER
+        <span class="ms-2" style="font-size:0.7rem; opacity:0.6; font-weight:400;">via Jellyfin API</span>
+    </h4>
+    {% if connected %}
+    <span class="badge conn-badge-ok"><i class="fas fa-circle me-1" style="font-size:0.6rem;"></i>JELLYFIN CONNECTED</span>
+    {% else %}
+    <span class="badge conn-badge-err"><i class="fas fa-circle me-1" style="font-size:0.6rem;"></i>NOT CONFIGURED</span>
+    {% endif %}
+</div>
+
+<div class="row">
+
+    <!-- ── LEFT COLUMN ──────────────────────────────────────── -->
+    <div class="col-lg-3">
+
+        <!-- Jellyfin Config -->
+        <div class="card p-3 shadow-sm mb-3" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
+            <h6 style="color: var(--plex-orange); font-weight:800; margin-bottom:12px;">
+                <i class="fas fa-key me-2"></i>JELLYFIN CONFIG
+            </h6>
+            <form action="/iptv/save_config" method="post">
+                <div class="mb-2">
+                    <label class="fw-bold" style="color: var(--plex-orange); font-size:0.72rem;">API KEY</label>
+                    <div class="input-group input-group-sm">
+                        <input type="password" name="api_key" id="api_key_field"
+                               class="form-control"
+                               value="{{ cfg.api_key }}"
+                               placeholder="Paste Jellyfin API key...">
+                        <button type="button" class="btn btn-sm"
+                                style="background:#1f2326; border:1px solid var(--plex-orange); color: var(--plex-orange);"
+                                onclick="toggleKey()">
+                            <i class="fas fa-eye" id="eye-icon"></i>
+                        </button>
+                    </div>
+                    <div class="mt-1" style="font-size:0.65rem; color:#888;">
+                        Dashboard → Advanced → API Keys
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold" style="color: var(--plex-orange); font-size:0.72rem;">SAVE PATH</label>
+                    <input type="text" name="save_path" class="form-control form-control-sm"
+                           value="{{ cfg.save_path }}"
+                           placeholder="/home/user/Videos/IPTV">
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-sm flex-fill"
+                            style="background: var(--plex-orange); color:#000; font-weight:800; border:none;">
+                        SAVE
+                    </button>
+                    <button type="button" class="btn btn-sm"
+                            style="border:1px solid var(--plex-orange); color: var(--plex-orange); background:transparent;"
+                            onclick="testConnection()">
+                        <i class="fas fa-plug me-1"></i>TEST
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Channel Browser -->
+        <div class="card p-3 shadow-sm" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
+            <h6 style="color: var(--plex-orange); font-weight:800; margin-bottom:10px;">
+                <i class="fas fa-tv me-2"></i>CHANNELS
+                <span class="ms-1" style="font-size:0.65rem; opacity:0.6;">({{ channels|length }})</span>
+            </h6>
+            {% if not connected %}
+            <div style="color:#888; font-size:0.8rem; text-align:center; padding:20px 0;">
+                <i class="fas fa-satellite-dish mb-2" style="font-size:1.5rem; color:#333; display:block;"></i>
+                Configure API key to browse channels
+            </div>
+            {% elif channels|length == 0 %}
+            <div style="color:#888; font-size:0.8rem; text-align:center; padding:20px 0;">
+                No channels found.<br>
+                <small>Add an M3U tuner in Jellyfin → Dashboard → Live TV.</small>
+            </div>
+            {% else %}
+            <input type="text" id="channelSearch" class="form-control form-control-sm mb-2"
+                   placeholder="? FILTER CHANNELS..."
+                   oninput="filterChannels(this.value)">
+            <div class="ch-list-wrap" id="channelList">
+                {% for ch in channels %}
+                <div class="channel-row"
+                     data-id="{{ ch.id }}"
+                     data-name="{{ ch.name }}"
+                     onclick="selectChannel(this)">
+                    <span class="channel-num">{{ ch.number or '' }}</span>
+                    {% if ch.icon_url %}
+                    <img src="{{ ch.icon_url }}" class="channel-icon" alt="" onerror="this.style.display='none'">
+                    {% else %}
+                    <div class="channel-icon-placeholder">
+                        <i class="fas fa-tv" style="font-size:0.65rem; color:#555;"></i>
+                    </div>
+                    {% endif %}
+                    <span style="font-size:0.82rem; color:#ddd;">{{ ch.name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── RIGHT COLUMN ─────────────────────────────────────── -->
+    <div class="col-lg-9">
+
+        <!-- Schedule Form -->
+        <div class="card p-3 mb-3" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
+            <h6 style="color: var(--plex-orange); font-weight:800; margin-bottom:14px;">
+                <i class="fas fa-calendar-plus me-2"></i>SCHEDULE IPTV RECORDING
+            </h6>
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="fw-bold" style="color: var(--plex-orange); font-size:0.72rem;">SELECTED CHANNEL</label>
+                    <input type="text" id="sel_channel_name" class="form-control form-control-sm"
+                           placeholder="Click a channel →" readonly
+                           style="cursor:pointer;">
+                    <input type="hidden" id="sel_channel_id">
+                </div>
+                <div class="col-md-3">
+                    <label class="fw-bold" style="color: var(--plex-orange); font-size:0.72rem;">CUSTOM PREFIX / TITLE</label>
+                    <input type="text" id="rec_prefix" class="form-control form-control-sm"
+                           placeholder="e.g. Champions_League_Final">
+                </div>
+                <div class="col-md-2">
+                    <label class="fw-bold" style="color: var(--plex-orange); font-size:0.72rem;">START DATE & TIME</label>
+                    <input type="datetime-local" id="rec_start" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-1">
+                    <label class="fw-bold" style="color: var(--plex-orange); font-size:0.72rem;">HRS</label>
+                    <input type="number" id="rec_hours" class="form-control form-control-sm"
+                           value="1.5" step="0.25" min="0.25" max="12">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-sm w-100" id="scheduleBtn"
+                            style="background: var(--plex-orange); color:#000; font-weight:800; border:none;"
+                            onclick="scheduleRecording()">
+                        <i class="fas fa-plus me-1"></i>SCHEDULE
+                    </button>
+                </div>
+            </div>
+            <div id="formError" class="mt-2" style="color:#dc3545; font-size:0.78rem; display:none;"></div>
+        </div>
+
+        <!-- Active Recordings (shared with dashboard) -->
+        {% if active %}
+        <div class="card p-3 mb-3" style="border: 2px solid #ff0000; background-color: var(--plex-black);">
+            <h6 style="color: #ff0000; font-weight:800;">
+                <i class="fas fa-record-vinyl fa-spin me-2"></i>LIVE RECORDINGS
+            </h6>
+            <table class="table table-dark align-middle mb-0">
+                <thead style="color: #ff0000; font-size:0.7rem; border-bottom: 2px solid #ff0000;">
+                    <tr><th>NAME</th><th>STARTED</th><th>STATUS</th></tr>
+                </thead>
+                <tbody>
+                    {% for rec in active %}
+                    <tr>
+                        <td class="fw-bold">{{ rec.name }}</td>
+                        <td style="color:#ff0000;">{{ rec.start }}</td>
+                        <td><span class="badge" style="background:#ff0000; animation: blinker 1.5s infinite;">RECORDING</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Pending Timers -->
+        <div class="card p-3 mb-3" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="m-0" style="color: var(--plex-orange); font-weight:800;">
+                    <i class="fas fa-clock me-2"></i>PENDING TIMERS
+                    <span id="timerCount" class="ms-1" style="font-size:0.65rem; opacity:0.6;">({{ timers|length }})</span>
+                </h6>
+                <button class="btn btn-sm"
+                        style="border:1px solid var(--plex-orange); color:var(--plex-orange); background:transparent; font-size:0.72rem;"
+                        onclick="refreshTimers()">
+                    <i class="fas fa-sync me-1"></i>REFRESH
+                </button>
+            </div>
+            <div id="timersTableWrap">
+            {% if timers %}
+            <table class="table table-dark align-middle mb-0" id="timersTable">
+                <thead style="color: var(--plex-orange); font-size:0.7rem; border-bottom: 2px solid var(--plex-orange);">
+                    <tr>
+                        <th style="width:35%;">NAME</th>
+                        <th>CHANNEL</th>
+                        <th>STARTS</th>
+                        <th>STATUS</th>
+                        <th class="text-end">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in timers %}
+                    <tr id="timer-row-{{ t.id }}">
+                        <td class="fw-bold text-white">{{ t.name }}</td>
+                        <td style="color: var(--plex-orange); font-size:0.8rem;">{{ t.channel_name }}</td>
+                        <td style="font-size:0.8rem;">{{ t.start_display }}</td>
+                        <td>
+                            {% if t.status == 'InProgress' %}
+                            <span class="badge" style="background:#ff0000; animation: blinker 1.5s infinite;">RECORDING</span>
+                            {% else %}
+                            <span class="badge" style="background: var(--plex-orange); color:#000;">{{ t.status|upper }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm text-danger"
+                                    onclick="cancelTimer('{{ t.id }}', this)"
+                                    title="Cancel timer">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div id="noTimers" style="color:#666; font-size:0.82rem; text-align:center; padding:18px 0;">
+                No pending timers. Schedule a recording above.
+            </div>
+            {% endif %}
+            </div>
+        </div>
+
+        <!-- Completed Recordings -->
+        <div class="card p-3" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
+            <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2"
+                 style="border-color: var(--plex-orange) !important;">
+                <h6 class="m-0" style="color: var(--plex-orange); font-weight:800;">
+                    <i class="fas fa-photo-video me-2"></i>IPTV RECORDING LIBRARY
+                </h6>
+                <input type="text" id="recSearch" class="form-control form-control-sm w-25"
+                       placeholder="SEARCH..." oninput="filterRecordings(this.value)">
+            </div>
+            {% if recordings %}
+            <table class="table table-dark table-hover align-middle mb-0" id="recTable">
+                <thead style="color: var(--plex-orange); font-size:0.7rem; border-bottom: 2px solid var(--plex-orange);">
+                    <tr>
+                        <th style="width:40%;">NAME</th>
+                        <th>CHANNEL</th>
+                        <th>DATE</th>
+                        <th>DURATION</th>
+                        <th class="text-end">SIZE</th>
+                        <th class="text-end">DEL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rec in recordings %}
+                    <tr class="file-item" id="rec-row-{{ rec.id }}">
+                        <td>
+                            <a href="http://localhost:8096/web/index.html#!/" target="_blank">
+                                <i class="fas fa-play-circle me-2" style="color: var(--plex-orange); font-size:1.1rem;"></i>
+                            </a>
+                            <span class="text-white fw-bold">{{ rec.name }}</span>
+                            <br>
+                            <small style="color:#555; font-size:0.65rem;">{{ rec.path | replace('/home/jc-media/', '~/') }}</small>
+                        </td>
+                        <td style="color: var(--plex-orange); font-size:0.8rem;">{{ rec.channel_name }}</td>
+                        <td style="font-size:0.78rem;">{{ rec.start_display }}</td>
+                        <td>
+                            <span class="badge" style="background: var(--plex-orange); color:#000;">
+                                {{ rec.duration_min }} MIN
+                            </span>
+                        </td>
+                        <td class="text-end text-white" style="font-size:0.8rem;">
+                            {% if rec.size_mb > 0 %}{{ rec.size_mb }} MB{% else %}—{% endif %}
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm text-danger"
+                                    onclick="deleteRecording('{{ rec.id }}', this)"
+                                    title="Delete recording">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="color:#666; font-size:0.82rem; text-align:center; padding:24px 0;">
+                <i class="fas fa-satellite-dish mb-2" style="font-size:2rem; color:#222; display:block;"></i>
+                No completed IPTV recordings found.
+            </div>
+            {% endif %}
+        </div>
+
+    </div><!-- /col-lg-9 -->
+</div><!-- /row -->
+
+<!-- Toast container -->
+<div id="toast-box"></div>
+
+<script>
+// ── Channel selection ───────────────────────────────────────────────────────
+function selectChannel(el) {
+    document.querySelectorAll('.channel-row').forEach(r => r.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('sel_channel_id').value   = el.dataset.id;
+    document.getElementById('sel_channel_name').value = el.dataset.name;
+}
+
+function filterChannels(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('.channel-row').forEach(row => {
+        row.style.display = row.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+// ── API key toggle ──────────────────────────────────────────────────────────
+function toggleKey() {
+    const f = document.getElementById('api_key_field');
+    const i = document.getElementById('eye-icon');
+    if (f.type === 'password') { f.type = 'text'; i.className = 'fas fa-eye-slash'; }
+    else                       { f.type = 'password'; i.className = 'fas fa-eye'; }
+}
+
+// ── Connection test ─────────────────────────────────────────────────────────
+function testConnection() {
+    toast('Testing connection…', 'ok');
+    fetch('/iptv/test_connection')
+        .then(r => r.json())
+        .then(d => toast(d.message, d.ok ? 'ok' : 'err'))
+        .catch(e => toast('Request failed: ' + e, 'err'));
+}
+
+// ── Schedule recording ──────────────────────────────────────────────────────
+function scheduleRecording() {
+    const channelId   = document.getElementById('sel_channel_id').value;
+    const channelName = document.getElementById('sel_channel_name').value;
+    const prefix      = document.getElementById('rec_prefix').value.trim();
+    const startLocal  = document.getElementById('rec_start').value;
+    const hours       = parseFloat(document.getElementById('rec_hours').value);
+    const errDiv      = document.getElementById('formError');
+
+    errDiv.style.display = 'none';
+
+    if (!channelId)   { showFormError('Please select a channel.'); return; }
+    if (!startLocal)  { showFormError('Please set a start date & time.'); return; }
+    if (!hours || hours <= 0) { showFormError('Duration must be > 0.'); return; }
+
+    // Convert local datetime-local value to ISO UTC
+    const localDt  = new Date(startLocal);
+    const startIso = localDt.toISOString();
+    const recName  = prefix || channelName;
+
+    const btn = document.getElementById('scheduleBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch spin me-1"></i>SCHEDULING…';
+
+    fetch('/api/jellyfin/timers', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            channel_id:       channelId,
+            start_iso:        startIso,
+            duration_seconds: Math.round(hours * 3600),
+            name:             recName,
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-plus me-1"></i>SCHEDULE';
+        if (d.ok) {
+            toast('Timer scheduled: ' + recName, 'ok');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            showFormError(d.message);
+        }
+    })
+    .catch(e => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-plus me-1"></i>SCHEDULE';
+        showFormError('Request failed: ' + e);
+    });
+}
+
+function showFormError(msg) {
+    const e = document.getElementById('formError');
+    e.textContent = '⚠ ' + msg;
+    e.style.display = 'block';
+}
+
+// ── Cancel timer ────────────────────────────────────────────────────────────
+function cancelTimer(timerId, btn) {
+    if (!confirm('Cancel this recording timer?')) return;
+    btn.disabled = true;
+    fetch(`/api/jellyfin/timers/${timerId}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) {
+                const row = document.getElementById('timer-row-' + timerId);
+                if (row) row.remove();
+                toast('Timer cancelled.', 'ok');
+                updateTimerCount();
+            } else {
+                toast(d.message, 'err');
+                btn.disabled = false;
+            }
+        })
+        .catch(e => { toast('Error: ' + e, 'err'); btn.disabled = false; });
+}
+
+function updateTimerCount() {
+    const rows = document.querySelectorAll('#timersTable tbody tr');
+    document.getElementById('timerCount').textContent = '(' + rows.length + ')';
+    if (rows.length === 0) {
+        document.getElementById('timersTableWrap').innerHTML =
+            '<div style="color:#666;font-size:0.82rem;text-align:center;padding:18px 0;">No pending timers.</div>';
+    }
+}
+
+function refreshTimers() {
+    location.reload();
+}
+
+// ── Delete recording ────────────────────────────────────────────────────────
+function deleteRecording(recId, btn) {
+    if (!confirm('Delete this recording from Jellyfin?\n(File will also be removed from disk.)')) return;
+    btn.disabled = true;
+    fetch(`/api/jellyfin/recordings/${recId}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) {
+                const row = document.getElementById('rec-row-' + recId);
+                if (row) row.remove();
+                toast('Recording deleted.', 'ok');
+            } else {
+                toast(d.message, 'err');
+                btn.disabled = false;
+            }
+        })
+        .catch(e => { toast('Error: ' + e, 'err'); btn.disabled = false; });
+}
+
+// ── Filter recordings table ─────────────────────────────────────────────────
+function filterRecordings(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('.file-item').forEach(row => {
+        row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+// ── Toast helper ────────────────────────────────────────────────────────────
+function toast(msg, type) {
+    const box = document.getElementById('toast-box');
+    const el  = document.createElement('div');
+    el.className = 'toast-msg toast-' + (type === 'ok' ? 'ok' : 'err');
+    el.textContent = msg;
+    box.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+}
+
+// ── Pre-fill datetime to now + 5 min ───────────────────────────────────────
+(function () {
+    const dt = new Date(Date.now() + 5 * 60000);
+    const pad = n => String(n).padStart(2, '0');
+    const local = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+    document.getElementById('rec_start').value = local;
+})();
+</script>
+{% endblock %}
