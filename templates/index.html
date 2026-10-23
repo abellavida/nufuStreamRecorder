@@ -51,7 +51,7 @@
                     </div>
                     <div class="col-6">
                         <label class="fw-bold" style="color: var(--plex-orange); font-size: 0.75rem;">HRS</label>
-                        <input type="number" step="0.1" name="hours" class="form-control" value="1.0" required>
+                        <input type="number" step="0.1" name="hours" class="form-control" value="3.5" required>
                     </div>
                 </div>
 
@@ -119,7 +119,7 @@
                 <tbody>
                     {% for f in files %}
                     <tr class="file-item">
-                        <td><a href="http://localhost:32400/web/index.html#!/" target="_blank"><i class="fas fa-play-circle me-3" style="color: var(--plex-orange); font-size: 1.2rem;"></i></a><span class="text-white fw-bold">{{ f.name }}</span></td>
+                        <td><a href="http://localhost:32400/web/index.html#!/" target="_blank"><i class="fas fa-play-circle me-3" style="color: var(--plex-orange); font-size: 1.2rem;"></i></a><sp[...]
                         <td style="color: var(--plex-orange);">{{ f.date }}<br><small>{{ f.time_created }}</small></td>
                         <td><span class="badge" style="background: var(--plex-orange); color: #000;">{{ f.duration }}</span></td>
                         <td class="text-end text-white">{{ f.size }}</td>
@@ -143,3 +143,4 @@
     });
 </script>
 {% endblock %}
+

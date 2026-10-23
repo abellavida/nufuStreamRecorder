@@ -222,11 +222,11 @@ def index():
         files.sort(key=lambda x: os.path.getmtime(os.path.join(save_path, x['name'])), reverse=True)
 
     return render_template('index.html',
-                           data=api_data,
-                           settings=settings,
-                           schedules=load_schedules(),
-                           active=active_recordings.values(),
-                           files=files)
+                            data=api_data,
+                            settings=settings,
+                            schedules=load_schedules(),
+                            active=active_recordings.values(),
+                            files=files)
 
 
 @app.route('/add', methods=['POST'])
@@ -239,14 +239,15 @@ def add():
         selected_days = [datetime.now().strftime('%a').lower()]
         one_time = True
 
+    hours_input = request.form.get('hours') or 3.5
     task = {
         'uuid': str(uuid.uuid4()),
         'id': request.form.get('stream_id'),
         'name': request.form.get('stream_name'),
         'custom_prefix': request.form.get('custom_prefix', '').strip(),
         'time': request.form.get('time'),
-        'duration_seconds': int(float(request.form.get('hours', 1)) * 3600),
-        'duration_display': f"{request.form.get('hours')} HRS",
+        'duration_seconds': int(float(hours_input) * 3600),
+        'duration_display': f"{hours_input} HRS",
         'days': selected_days,
         'one_time': one_time  # Flag for auto-delete
     }
@@ -284,3 +285,4 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
 
 # Update 5.15.2026
+
