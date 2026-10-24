@@ -59,7 +59,16 @@
                             {% for cat, items in data.items() if items is iterable %}
                                 <optgroup label="{{ cat.upper() }}">
                                 {% for item in items %}
-                                    <option value="{{ item.channel_id or item.fixture_id }}">{{ item.channel_name or item.fixture_name }}</option>
+                                    {% set base_name = item.channel_name or item.fixture_name %}
+                                    {% set fixture_id = item.fixture_id|string %}
+                                    {% if fixture_id.endswith('_home') %}
+                                        {% set display_name = base_name ~ ' (Home)' %}
+                                    {% elif fixture_id.endswith('_away') %}
+                                        {% set display_name = base_name ~ ' (Away)' %}
+                                    {% else %}
+                                        {% set display_name = base_name %}
+                                    {% endif %}
+                                    <option value="{{ item.channel_id or item.fixture_id }}">{{ display_name }}</option>
                                 {% endfor %}
                                 </optgroup>
                             {% endfor %}
