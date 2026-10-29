@@ -107,6 +107,41 @@
             </table>
         </div>
 
+        <div class="card p-3 mb-4" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2" style="border-color: var(--plex-orange) !important;">
+                <h5 class="m-0" style="color: var(--plex-orange); font-weight: 800;">🏒 UPCOMING FAVORITE-TEAM GAMES · 7 DAYS</h5>
+                <a href="/favorites" class="btn btn-outline-warning btn-sm">MANAGE FAVORITES</a>
+            </div>
+            {% if team_games %}
+            <div class="table-responsive">
+                <table class="table table-dark table-sm align-middle mb-0">
+                    <thead style="color: var(--plex-orange); font-size: 0.7rem; border-bottom: 2px solid var(--plex-orange);">
+                        <tr><th>LEAGUE</th><th>GAME (VISITOR @ HOME)</th><th>DATE</th><th>START TIME</th><th>STATUS</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for game in team_games %}
+                        <tr>
+                            <td>{{ game.league }}</td>
+                            <td class="fw-bold text-white">{{ game.away_name }} @ {{ game.home_name }}</td>
+                            <td>{{ game.game_date }}</td>
+                            <td>{{ game.game_time }}</td>
+                            <td>
+                                {% if game.recording_state == 'recording' %}Recording
+                                {% elif game.recording_state == 'completed' %}Completed
+                                {% elif game.recording_state == 'failed' %}Failed
+                                {% elif game.recording_state == 'missed' %}Missed
+                                {% else %}Scheduled{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="mb-0">No favorite-team games are scheduled in the next seven days. <a href="/favorites">Choose teams</a> or check back after the next schedule refresh.</p>
+            {% endif %}
+        </div>
+
         <div class="card p-3" style="border: 1px solid var(--plex-orange); background-color: var(--plex-black);">
             <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2" style="border-color: var(--plex-orange) !important;">
                 <h5 class="m-0" style="color: var(--plex-orange); font-weight: 800;">📁 RECORDING LIBRARY</h5>

@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-5">
+    <div class="col-lg-8">
         <div class="card p-4 shadow" style="border: 1px solid var(--plex-orange);">
             <h4 class="mb-4 text-center" style="color: var(--plex-orange); font-weight: 800; border-bottom: 2px solid var(--plex-orange); padding-bottom: 15px;">
                 <i class="fas fa-tools me-2"></i>SYSTEM CONFIGURATION
@@ -22,27 +22,15 @@
                     </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="form-label fw-bold" style="color: var(--plex-orange); font-size: 0.9rem; letter-spacing: 1.5px;">
-                        GOOGLE GEMINI API KEY
-                    </label>
-                    <input type="password" name="gemini_key" class="form-control"
-                           style="border: 1px solid var(--plex-orange); background-color: #000; color: #fff;"
-                           value="{{ settings.gemini_key }}" placeholder="Enter AI Key">
-                    <div class="form-text mt-2" style="color: var(--plex-orange); opacity: 0.8; font-size: 0.75rem;">
-                        <i class="fas fa-brain me-1"></i> Powers the AI Watchdog for stream verification and recovery.
-                    </div>
-                </div>
-
                 <div class="mb-5">
                     <label class="form-label fw-bold" style="color: var(--plex-orange); font-size: 0.9rem; letter-spacing: 1.5px;">
                         VIDEO STORAGE PATH
                     </label>
                     <input type="text" name="save_path" class="form-control"
                            style="border: 1px solid var(--plex-orange); background-color: #000; color: #fff;"
-                           value="{{ settings.save_path }}" placeholder="/path/to/recordings">
+                           value="{{ settings.save_path }}" placeholder="~/Videos/Recordings">
                     <div class="form-text mt-2" style="color: var(--plex-orange); opacity: 0.8; font-size: 0.75rem;">
-                        <i class="fas fa-folder-open me-1"></i> Absolute path where MP4 files will be saved.
+                        <i class="fas fa-folder-open me-1"></i> Folder where MP4 files will be saved; `~` expands to your user folder.
                     </div>
                 </div>
 
