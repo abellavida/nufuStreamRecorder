@@ -8,6 +8,8 @@ import threading
 import uuid
 import logging  # Added back
 import re
+import signal
+import math
 from datetime import datetime, timedelta, timezone
 from flask import Flask, abort, render_template, request, redirect
 import schedule
@@ -25,6 +27,14 @@ DEFAULT_SETTINGS = {
     "paid_api": "https://nufu.tv/json/jcarter@abellavida.com",
     "save_path": os.path.join(os.path.expanduser("~"), "Videos", "Recordings"),
     "sports_favorites": []
+}
+SPORT_RECORDING_MAX_HOURS = {"NHL": 6, "NFL": 5}
+EARLY_GAME_STATUS_POLL_INTERVAL = timedelta(minutes=5)
+LATE_GAME_STATUS_POLL_INTERVAL = timedelta(minutes=1)
+FAILED_SPORTS_START_RETRY_INTERVAL = timedelta(minutes=5)
+LATE_GAME_STATUS_THRESHOLDS = {
+    "NHL": {"period": 3, "elapsed": timedelta(hours=2, minutes=30)},
+    "NFL": {"period": 4, "elapsed": timedelta(hours=3)},
 }
 
 # --- LOGGING SETUP ---
@@ -46,6 +56,36 @@ def filename_component(value):
     cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(value))
     cleaned = re.sub(r"\s+", "_", cleaned).strip(" ._")
     return cleaned or "recording"
+
+
+def video_duration_display(path):
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            path,
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=15,
+    )
+    try:
+        seconds = float(result.stdout.strip())
+    except ValueError as exc:
+        raise ValueError(f"ffprobe returned an invalid duration for {path}") from exc
+    if not math.isfinite(seconds) or seconds < 0:
+        raise ValueError(f"ffprobe returned an invalid duration for {path}")
+
+    total_minutes = round(seconds / 60)
+    if total_minutes < 1:
+        return "< 1 MIN"
+    hours, minutes = divmod(total_minutes, 60)
+    if hours:
+        return f"{hours} HR {minutes} MIN" if minutes else f"{hours} HR"
+    return f"{minutes} MIN"
 
 
 def load_settings():
@@ -201,7 +241,8 @@ def _merge_sports_game_data(previous, fresh_games):
         "recording_state", "last_start_attempt", "last_start_error",
         "source_used", "selected_feed_id", "matched_fixture_name",
         "last_preflight_check", "preflight_source", "preflight_feed_id",
-        "preflight_feed_error",
+        "preflight_feed_error", "espn_event_id", "last_game_status",
+        "last_game_status_check", "last_game_status_error", "stop_reason",
     )
     merged = []
     for game in fresh_games:
@@ -344,10 +385,17 @@ def start_sports_recording(game_id, preflight=False):
             "selected_feed_id": str(item.get(feed_id_field)),
             "matched_fixture_name": name,
             "last_start_error": "",
+            "stop_reason": "",
         })
+        max_duration = SPORT_RECORDING_MAX_HOURS.get(game["league"], 6) * 3600
         recorder = threading.Thread(
             target=record_stream,
-            args=(stream_url, name, 4 * 3600, task_uuid, game["league"]),
+            args=(stream_url, name, max_duration, task_uuid, game["league"]),
+            kwargs={
+                "sports_game": game,
+                "sports_source": source_used,
+                "selected_feed_id": str(item.get(feed_id_field)),
+            },
             daemon=True,
         )
         recorder.start()
@@ -405,7 +453,8 @@ def check_due_sports_recordings():
     for game in load_team_schedule().get("games", []):
         if not favorites.intersection(game.get("favorite_teams", [])):
             continue
-        if game.get("recording_state") != "scheduled":
+        recording_state = game.get("recording_state")
+        if recording_state not in {"scheduled", "failed"}:
             continue
         try:
             start = datetime.fromisoformat(game["start_at"]).astimezone(timezone.utc)
@@ -414,10 +463,127 @@ def check_due_sports_recordings():
             continue
         if now > start + timedelta(hours=4):
             set_sports_recording_data(game["game_id"], {"recording_state": "missed"})
+        elif recording_state == "failed":
+            last_attempt = game.get("last_start_attempt")
+            try:
+                attempted_at = datetime.fromisoformat(last_attempt).astimezone(timezone.utc)
+            except (TypeError, ValueError):
+                attempted_at = None
+            if attempted_at and now - attempted_at < FAILED_SPORTS_START_RETRY_INTERVAL:
+                continue
+            set_sports_recording_data(game["game_id"], {
+                "recording_state": "scheduled",
+                "last_start_error": "",
+            })
+            _queue_sports_recording_start(game["game_id"])
         elif start - timedelta(minutes=3) <= now < start:
             _queue_sports_recording_start(game["game_id"], preflight=True)
         elif now >= start:
             _queue_sports_recording_start(game["game_id"])
+    check_active_sports_recordings(now)
+
+
+def _late_game_status(game, status, elapsed):
+    threshold = LATE_GAME_STATUS_THRESHOLDS.get(game.get("league"))
+    if not threshold:
+        return elapsed >= timedelta(hours=3)
+    try:
+        period = int(status.get("period", 0))
+    except (TypeError, ValueError):
+        period = 0
+    return period >= threshold["period"] or elapsed >= threshold["elapsed"]
+
+
+def _stop_sports_recording(task_uuid, recording, reason):
+    with recordings_lock:
+        current = active_recordings.get(task_uuid)
+        if current is not recording or current.get("stop_reason"):
+            return False
+        current["stop_reason"] = reason
+        proc = current["proc"]
+    try:
+        proc.send_signal(signal.SIGINT)
+    except (OSError, ProcessLookupError, AttributeError):
+        logging.exception("Unable to gracefully stop sports recording %s", task_uuid)
+        try:
+            proc.terminate()
+        except (OSError, ProcessLookupError, AttributeError):
+            logging.exception("Unable to terminate sports recording %s", task_uuid)
+    logging.info("Stopping sports recording %s: %s", task_uuid, reason)
+    return True
+
+
+def check_active_sports_recordings(now=None):
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        raise ValueError("Sports recording check time must include a timezone")
+    now = now.astimezone(timezone.utc)
+    with recordings_lock:
+        recordings = [
+            (task_uuid, recording)
+            for task_uuid, recording in active_recordings.items()
+            if task_uuid.startswith("sports-")
+        ]
+
+    games_by_id = {
+        game.get("game_id"): game
+        for game in load_team_schedule().get("games", [])
+    }
+    for task_uuid, recording in recordings:
+        game_id = task_uuid.removeprefix("sports-")
+        game = games_by_id.get(game_id)
+        if not game:
+            logging.error("Unable to find scheduled game for active recording %s", task_uuid)
+            continue
+        started_at = recording.get("started_at")
+        if not isinstance(started_at, datetime):
+            logging.error("Active sports recording %s has no valid start time", task_uuid)
+            continue
+        elapsed = now - started_at
+        max_duration = timedelta(
+            hours=SPORT_RECORDING_MAX_HOURS.get(game.get("league"), 6)
+        )
+        if elapsed >= max_duration:
+            _stop_sports_recording(task_uuid, recording, "maximum_runtime")
+            continue
+
+        with recordings_lock:
+            if active_recordings.get(task_uuid) is not recording or recording.get("stop_reason"):
+                continue
+            last_check = recording.get("last_status_check")
+            previous_status = recording.get("last_game_status", {})
+            interval = (
+                LATE_GAME_STATUS_POLL_INTERVAL
+                if _late_game_status(game, previous_status, elapsed)
+                else EARLY_GAME_STATUS_POLL_INTERVAL
+            )
+            if isinstance(last_check, datetime) and now - last_check < interval:
+                continue
+            recording["last_status_check"] = now
+
+        try:
+            status = sports.fetch_game_status(game)
+        except (requests.RequestException, sports.SportsScheduleError, ValueError, TypeError) as exc:
+            logging.warning("Unable to check ESPN status for sports recording %s: %s", task_uuid, exc)
+            set_sports_recording_data(game_id, {
+                "last_game_status_check": now.isoformat(),
+                "last_game_status_error": str(exc),
+            })
+            continue
+
+        status_updates = {
+            "last_game_status_check": now.isoformat(),
+            "last_game_status": status,
+            "last_game_status_error": "",
+        }
+        if status.get("event_id"):
+            status_updates["espn_event_id"] = status["event_id"]
+        set_sports_recording_data(game_id, status_updates)
+        with recordings_lock:
+            if active_recordings.get(task_uuid) is recording:
+                recording["last_game_status"] = status
+        if status.get("completed"):
+            _stop_sports_recording(task_uuid, recording, "espn_final")
 
 
 def run_sports_monitor_loop():
@@ -436,7 +602,10 @@ recordings_lock = threading.Lock()
 
 # --- 2. Recording Engine ---
 # Added Logging Info back
-def record_stream(stream_url, name, duration, task_uuid, custom_prefix=""):
+def record_stream(
+    stream_url, name, duration, task_uuid, custom_prefix="",
+    *, sports_game=None, sports_source="", selected_feed_id="",
+):
     start_timestamp = datetime.now().strftime("%I:%M %p")
     recording_state = "failed"
 
@@ -451,55 +620,109 @@ def record_stream(stream_url, name, duration, task_uuid, custom_prefix=""):
         prefix_str = f"{prefix}_" if prefix else ""
         filename = os.path.join(save_path, f"{prefix_str}{clean_name}_{timestamp}.mp4")
 
-        cmd = [
-            'ffmpeg', '-y',
-            '-reconnect', '1',
-            '-reconnect_at_eof', '1',
-            '-reconnect_streamed', '1',
-            '-reconnect_delay_max', '5',
-            '-i', stream_url,
-            '-t', str(duration),
-            '-c', 'copy',
-            '-bsf:a', 'aac_adtstoasc',
-            filename
-        ]
+        recording_started = time.monotonic()
+        active_recording = None
+        fallback_attempted = False
+        while True:
+            remaining_duration = max(1, int(duration - (time.monotonic() - recording_started)))
+            cmd = [
+                'ffmpeg', '-y',
+                '-reconnect', '1',
+                '-reconnect_at_eof', '1',
+                '-reconnect_streamed', '1',
+                '-reconnect_delay_max', '5',
+                '-i', stream_url,
+                '-t', str(remaining_duration),
+                '-c', 'copy',
+                '-bsf:a', 'aac_adtstoasc',
+                filename
+            ]
 
-        # Capture stderr to pipe it into our log file
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
 
-        with recordings_lock:
-            active_recordings[task_uuid] = {
-                "name": name,
-                "proc": proc,
-                "start": start_timestamp
-            }
+            with recordings_lock:
+                if active_recording is None:
+                    active_recording = {
+                        "name": name,
+                        "proc": proc,
+                        "start": start_timestamp,
+                        "started_at": datetime.now(timezone.utc),
+                        "stop_reason": "",
+                        "last_status_check": None,
+                        "last_game_status": {},
+                    }
+                    active_recordings[task_uuid] = active_recording
+                else:
+                    active_recording["proc"] = proc
 
-        logging.info(f"RECORDING STARTED: {name} -> {filename}")
+            logging.info("RECORDING STARTED: %s -> %s", name, filename)
+            for line in proc.stderr:
+                log_ffmpeg(name, line.strip())
+            proc.wait()
+            if proc.returncode == 0:
+                recording_state = "completed"
+                break
 
-        # Log FFmpeg output in real-time
-        for line in proc.stderr:
-            log_ffmpeg(name, line.strip())
+            recording_state = "failed"
+            if not sports_game or sports_source != "games" or fallback_attempted:
+                break
+            fallback_attempted = True
+            with recordings_lock:
+                if active_recording and active_recording.get("stop_reason"):
+                    break
+            try:
+                fallback_feed = sports.find_broadcast_channel(sports_game, get_nufu_feed())
+            except (requests.RequestException, ValueError, TypeError) as exc:
+                logging.error(
+                    "Unable to refresh NUFU broadcast channels after fixture failure for %s: %s",
+                    name, exc,
+                )
+                break
 
-        proc.wait()
-        recording_state = "completed" if proc.returncode == 0 else "failed"
+            fallback_id = str(fallback_feed.get("channel_id", "")) if fallback_feed else ""
+            fallback_url = fallback_feed.get("secure_url") if fallback_feed else None
+            if not fallback_url or not fallback_id or fallback_id == selected_feed_id:
+                logging.warning(
+                    "No distinct broadcast-channel fallback is available after fixture failure for %s",
+                    name,
+                )
+                break
+
+            stream_url = fallback_url
+            selected_feed_id = fallback_id
+            sports_source = "channels"
+            set_sports_recording_data(task_uuid.removeprefix("sports-"), {
+                "source_used": sports_source,
+                "selected_feed_id": selected_feed_id,
+                "matched_fixture_name": fallback_feed.get("channel_name", name),
+                "last_start_error": "",
+            })
+            logging.warning(
+                "Fixture stream failed; retrying %s on NUFU broadcast channel %s",
+                name, fallback_feed.get("channel_name", fallback_id),
+            )
 
     except Exception as e:
         logging.error(f"ERROR DURING RECORDING ({name}): {e}")
 
     finally:
         with recordings_lock:
-            active_recordings.pop(task_uuid, None)
+            recording = active_recordings.pop(task_uuid, {})
+        stop_reason = recording.get("stop_reason", "")
+        if stop_reason:
+            recording_state = "completed"
 
         if task_uuid.startswith("sports-"):
             set_sports_recording_data(task_uuid.removeprefix("sports-"), {
                 "recording_state": recording_state,
+                "stop_reason": stop_reason,
             })
 
         # ONE-TIME PURGE LOGIC
@@ -585,8 +808,11 @@ def index():
                 p = os.path.join(save_path, f)
                 try:
                     stat = os.stat(p)
-                    approx_mins = (stat.st_size * 8) / (3000000) / 60
-                    duration_str = f"{int(approx_mins)} MIN" if approx_mins > 1 else "< 1 MIN"
+                    try:
+                        duration_str = video_duration_display(p)
+                    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+                        logging.warning("Unable to determine video duration for %s: %s", p, exc)
+                        duration_str = "Unknown"
 
                     dt = datetime.fromtimestamp(stat.st_mtime)
                     files.append({
