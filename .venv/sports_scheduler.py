@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import re
+from difflib import SequenceMatcher
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -39,7 +40,7 @@ TEAMS = {
         "PHI": ("Philadelphia Flyers", "Flyers"),
         "PIT": ("Pittsburgh Penguins", "Penguins", "Pens"),
         "SEA": ("Seattle Kraken", "Kraken"),
-        "SJS": ("San Jose Sharks", "SJ Sharks", "Sharks"),
+        "SJS": ("San Jose Sharks", "SJ", "SJ Sharks", "Sharks"),
         "STL": ("St. Louis Blues", "St Louis Blues", "Blues"),
         "TBL": ("Tampa Bay Lightning", "Lightning", "Bolts"),
         "TOR": ("Toronto Maple Leafs", "Maple Leafs", "Leafs"),
@@ -92,6 +93,34 @@ TEAM_LOOKUP = {
     for name in (abbr, *names)
     for normalize in [re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()]
 }
+ESPN_TEAM_ABBREVIATIONS = {
+    "NHL": {
+        "ANA": "ANA", "BOS": "BOS", "BUF": "BUF", "CAR": "CAR",
+        "CBJ": "CBJ", "CGY": "CGY", "CHI": "CHI", "COL": "COL",
+        "DAL": "DAL", "DET": "DET", "EDM": "EDM", "FLA": "FLA",
+        "LAK": "LA", "MIN": "MIN", "MTL": "MTL", "NSH": "NSH",
+        "NJD": "NJ", "NYI": "NYI", "NYR": "NYR", "OTT": "OTT",
+        "PHI": "PHI", "PIT": "PIT", "SEA": "SEA", "SJS": "SJ",
+        "STL": "STL", "TBL": "TB", "TOR": "TOR", "UTA": "UTAH",
+        "VAN": "VAN", "VGK": "VGK", "WPG": "WPG", "WSH": "WSH",
+    },
+    "NFL": {
+        "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BUF": "BUF",
+        "CAR": "CAR", "CHI": "CHI", "CIN": "CIN", "CLE": "CLE",
+        "DAL": "DAL", "DEN": "DEN", "DET": "DET", "GB": "GB",
+        "HOU": "HOU", "IND": "IND", "JAX": "JAX", "KC": "KC",
+        "LAC": "LAC", "LAR": "LAR", "LV": "LV", "MIA": "MIA",
+        "MIN": "MIN", "NE": "NE", "NO": "NO", "NYG": "NYG",
+        "NYJ": "NYJ", "PHI": "PHI", "PIT": "PIT", "SEA": "SEA",
+        "SF": "SF", "TB": "TB", "TEN": "TEN", "WAS": "WSH",
+    },
+}
+for league, abbreviations in ESPN_TEAM_ABBREVIATIONS.items():
+    TEAM_LOOKUP.update({
+        (league, re.sub(r"[^a-z0-9]+", " ", espn_abbreviation.lower()).strip()): abbreviation
+        for abbreviation, espn_abbreviation in abbreviations.items()
+        if espn_abbreviation != abbreviation
+    })
 
 
 class SportsScheduleError(ValueError):
@@ -126,6 +155,12 @@ def parse_team_id(value):
 
 def team_display(league, abbreviation):
     return TEAMS[league][abbreviation][0]
+
+
+def _espn_team_id(league, abbreviation):
+    league = league.upper()
+    abbreviation = abbreviation.upper()
+    return ESPN_TEAM_ABBREVIATIONS[league][abbreviation].lower()
 
 
 def team_aliases(league, abbreviation):
@@ -252,7 +287,7 @@ def _find_team_schedule_event(game, league, abbreviation, start):
     url = ESPN_SCHEDULE_URL.format(
         sport=sport,
         league=espn_league,
-        team=abbreviation.lower(),
+        team=_espn_team_id(league, abbreviation),
     )
     response = requests.get(url, params={"season": season}, timeout=15)
     response.raise_for_status()
@@ -267,12 +302,12 @@ def _find_team_schedule_event(game, league, abbreviation, start):
         if not isinstance(competitors, list):
             continue
         home = next(
-            (_team_abbreviation(team) for team in competitors
+            (resolve_team(league, _team_abbreviation(team)) for team in competitors
              if isinstance(team, dict) and team.get("homeAway") == "home"),
             "",
         )
         away = next(
-            (_team_abbreviation(team) for team in competitors
+            (resolve_team(league, _team_abbreviation(team)) for team in competitors
              if isinstance(team, dict) and team.get("homeAway") == "away"),
             "",
         )
@@ -355,7 +390,7 @@ def fetch_favorite_schedules(favorites, now=None):
         url = ESPN_SCHEDULE_URL.format(
             sport=sport,
             league=espn_league,
-            team=abbreviation.lower(),
+            team=_espn_team_id(league, abbreviation),
         )
         response = requests.get(url, params={"season": season}, timeout=20)
         response.raise_for_status()
@@ -426,6 +461,8 @@ def _item_text(item):
 
 
 def _contains_alias(text, aliases):
+    normalized_text = normalize_text(text)
+    text_words = normalized_text.split()
     for alias in aliases:
         words = normalize_text(alias).split()
         if not words:
@@ -433,6 +470,17 @@ def _contains_alias(text, aliases):
         pattern = r"(?<![a-z0-9])" + r"[\W_]*".join(map(re.escape, words)) + r"(?![a-z0-9])"
         if re.search(pattern, str(text), re.IGNORECASE):
             return True
+        compact_alias = "".join(words)
+        if len(compact_alias) < 7:
+            continue
+        for start in range(len(text_words)):
+            for word_count in range(1, min(len(words), len(text_words) - start) + 1):
+                candidate = "".join(text_words[start:start + word_count])
+                if (
+                    len(candidate) >= 7
+                    and SequenceMatcher(None, compact_alias, candidate).ratio() >= 0.9
+                ):
+                    return True
     return False
 
 
@@ -457,10 +505,11 @@ def _resolve_feed_team(league, value):
     return resolve_team(league, value)
 
 
-def find_live_game(game, feed):
+def find_live_game(game, feed, excluded_urls=None):
     items = feed.get("games", [])
     if not isinstance(items, list):
         return None
+    excluded_urls = excluded_urls or set()
     home_aliases = team_aliases(game["league"], game["home_team"])
     away_aliases = team_aliases(game["league"], game["away_team"])
     for item in items:
@@ -474,21 +523,49 @@ def find_live_game(game, feed):
             and _resolve_feed_team(game["league"], home_value) == game["home_team"]
             and _resolve_feed_team(game["league"], away_value) == game["away_team"]
         )
-        if (structured_match or (
+        if (
+            (structured_match or (
                 _contains_alias(text, home_aliases) and _contains_alias(text, away_aliases)
-        )) and _has_fixture_id(item) and item.get("secure_url"):
+            ))
+            and _has_fixture_id(item)
+            and item.get("secure_url")
+            and item.get("secure_url") not in excluded_urls
+        ):
             return item
     return None
 
 
-def find_broadcast_channel(game, feed):
+def find_fixture_by_id(feed, fixture_id, excluded_urls=None):
+    target = str(fixture_id or "").strip()
+    items = feed.get("games", [])
+    if not target or not isinstance(items, list):
+        return None
+    excluded_urls = excluded_urls or set()
+    for item in items:
+        if (
+            isinstance(item, dict)
+            and str(item.get("fixture_id", "")) == target
+            and item.get("secure_url")
+            and item["secure_url"] not in excluded_urls
+        ):
+            return item
+    return None
+
+
+def find_broadcast_channel(game, feed, excluded_urls=None):
     channels = game.get("broadcast_channels", [])
+    excluded_urls = excluded_urls or set()
     candidates = []
     for category, items in feed.items():
         if "channel" not in str(category).lower() or not isinstance(items, list):
             continue
         for item in items:
-            if not isinstance(item, dict) or not item.get("secure_url") or not _has_channel_id(item):
+            if (
+                not isinstance(item, dict)
+                or not item.get("secure_url")
+                or item.get("secure_url") in excluded_urls
+                or not _has_channel_id(item)
+            ):
                 continue
             name = _normalize_broadcast_name(
                 item.get("channel_name") or item.get("fixture_name") or ""

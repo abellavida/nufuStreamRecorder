@@ -10,6 +10,7 @@ import logging  # Added back
 import re
 import signal
 import math
+import tempfile
 from datetime import datetime, timedelta, timezone
 from flask import Flask, abort, render_template, request, redirect
 import schedule
@@ -167,8 +168,23 @@ def load_schedules():
 
 
 def save_json(path, data):
-    with open(path, 'w', encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+    directory = os.path.dirname(os.path.abspath(path))
+    fd, temporary_path = tempfile.mkstemp(
+        dir=directory,
+        prefix=f".{os.path.basename(path)}.",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(fd, 'w', encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        try:
+            os.unlink(temporary_path)
+        except FileNotFoundError:
+            pass
 
 
 def load_team_schedule():
@@ -621,10 +637,20 @@ def record_stream(
         filename = os.path.join(save_path, f"{prefix_str}{clean_name}_{timestamp}.mp4")
 
         recording_started = time.monotonic()
+        last_returncode = None
         active_recording = None
-        fallback_attempted = False
+        recording_part = 1
+        failed_stream_urls = set()
         while True:
-            remaining_duration = max(1, int(duration - (time.monotonic() - recording_started)))
+            remaining = duration - (time.monotonic() - recording_started)
+            if remaining <= 0:
+                recording_state = "completed" if last_returncode == 0 else "failed"
+                break
+            remaining_duration = max(1, int(remaining))
+            part_filename = (
+                filename if recording_part == 1
+                else f"{filename[:-4]}_part{recording_part:02}.mp4"
+            )
             cmd = [
                 'ffmpeg', '-y',
                 '-reconnect', '1',
@@ -635,7 +661,7 @@ def record_stream(
                 '-t', str(remaining_duration),
                 '-c', 'copy',
                 '-bsf:a', 'aac_adtstoasc',
-                filename
+                part_filename
             ]
 
             proc = subprocess.Popen(
@@ -658,56 +684,82 @@ def record_stream(
                         "last_status_check": None,
                         "last_game_status": {},
                     }
-                    active_recordings[task_uuid] = active_recording
                 else:
                     active_recording["proc"] = proc
+                active_recordings[task_uuid] = active_recording
 
-            logging.info("RECORDING STARTED: %s -> %s", name, filename)
+            logging.info("RECORDING STARTED: %s -> %s", name, part_filename)
             for line in proc.stderr:
                 log_ffmpeg(name, line.strip())
             proc.wait()
-            if proc.returncode == 0:
+            last_returncode = proc.returncode
+            if not sports_game:
+                recording_state = "completed" if proc.returncode == 0 else "failed"
+                break
+            with recordings_lock:
+                stop_reason = active_recording.get("stop_reason", "")
+            if stop_reason:
                 recording_state = "completed"
                 break
 
-            recording_state = "failed"
-            if not sports_game or sports_source != "games" or fallback_attempted:
-                break
-            fallback_attempted = True
-            with recordings_lock:
-                if active_recording and active_recording.get("stop_reason"):
-                    break
-            try:
-                fallback_feed = sports.find_broadcast_channel(sports_game, get_nufu_feed())
-            except (requests.RequestException, ValueError, TypeError) as exc:
-                logging.error(
-                    "Unable to refresh NUFU broadcast channels after fixture failure for %s: %s",
-                    name, exc,
-                )
+            remaining = duration - (time.monotonic() - recording_started)
+            if remaining <= 0:
+                recording_state = "completed" if proc.returncode == 0 else "failed"
                 break
 
-            fallback_id = str(fallback_feed.get("channel_id", "")) if fallback_feed else ""
-            fallback_url = fallback_feed.get("secure_url") if fallback_feed else None
-            if not fallback_url or not fallback_id or fallback_id == selected_feed_id:
-                logging.warning(
-                    "No distinct broadcast-channel fallback is available after fixture failure for %s",
-                    name,
-                )
-                break
-
-            stream_url = fallback_url
-            selected_feed_id = fallback_id
-            sports_source = "channels"
-            set_sports_recording_data(task_uuid.removeprefix("sports-"), {
-                "source_used": sports_source,
-                "selected_feed_id": selected_feed_id,
-                "matched_fixture_name": fallback_feed.get("channel_name", name),
-                "last_start_error": "",
-            })
             logging.warning(
-                "Fixture stream failed; retrying %s on NUFU broadcast channel %s",
-                name, fallback_feed.get("channel_name", fallback_id),
+                "Sports stream ended before its recording window: %s (FFmpeg exit %s)",
+                name, proc.returncode,
             )
+            failed_stream_urls.add(stream_url)
+            while True:
+                remaining = duration - (time.monotonic() - recording_started)
+                if remaining <= 0:
+                    break
+                time.sleep(min(15, remaining))
+                try:
+                    feed = get_nufu_feed()
+                    if sports_source == "games":
+                        item = sports.find_fixture_by_id(
+                            feed, selected_feed_id, excluded_urls=failed_stream_urls
+                        )
+                        refreshed_source = "games"
+                    else:
+                        item = None
+                        refreshed_source = "channels"
+                    if not item:
+                        item = sports.find_broadcast_channel(
+                            sports_game, feed, excluded_urls=failed_stream_urls
+                        )
+                        refreshed_source = "channels"
+                    refreshed_url = item.get("secure_url") if item else None
+                    refreshed_id = (
+                        str(item.get("fixture_id") if refreshed_source == "games"
+                             else item.get("channel_id"))
+                        if item else ""
+                    )
+                    if not refreshed_url or not refreshed_id:
+                        logging.warning("No untried NUFU stream is available for %s", name)
+                        continue
+                    stream_url = refreshed_url
+                    sports_source = refreshed_source
+                    selected_feed_id = refreshed_id
+                    recording_part += 1
+                    set_sports_recording_data(task_uuid.removeprefix("sports-"), {
+                        "source_used": sports_source,
+                        "selected_feed_id": selected_feed_id,
+                        "matched_fixture_name": (
+                            item.get("fixture_name") or item.get("channel_name") or name
+                        ),
+                        "last_start_error": "",
+                    })
+                    logging.info(
+                        "Restarting sports recording %s from NUFU %s feed",
+                        name, sports_source,
+                    )
+                    break
+                except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
+                    logging.warning("Unable to refresh NUFU stream for %s: %s", name, exc)
 
     except Exception as e:
         logging.error(f"ERROR DURING RECORDING ({name}): {e}")

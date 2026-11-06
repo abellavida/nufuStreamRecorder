@@ -198,6 +198,19 @@ class SportsPageTests(unittest.TestCase):
 
 
 class VideoDurationTests(unittest.TestCase):
+    def test_save_json_replaces_file_with_complete_json(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schedule.json"
+            path.write_text('{"old": true}', encoding="utf-8")
+
+            app.save_json(path, {"games": [{"game_id": "game-1"}]})
+
+            self.assertEqual(
+                json.loads(path.read_text(encoding="utf-8")),
+                {"games": [{"game_id": "game-1"}]},
+            )
+            self.assertEqual([entry.name for entry in Path(directory).iterdir()], ["schedule.json"])
+
     def test_video_duration_uses_ffprobe_and_formats_hours_and_minutes(self):
         with patch.object(
             app.subprocess, "run",
@@ -265,6 +278,63 @@ class SportsFeedSelectionTests(unittest.TestCase):
 
         self.assertIs(result, fixture)
 
+    def test_games_feed_matches_single_character_team_name_typo(self):
+        game = {
+            "league": "NHL",
+            "home_team": "NYI",
+            "away_team": "CAR",
+        }
+        fixture = {
+            "fixture_name": "slanders @ CarolinaHurricanes",
+            "fixture_id": "islanders-hurricanes",
+            "secure_url": "https://example.invalid/game",
+        }
+
+        result = sports_scheduler.find_live_game(game, {"games": [fixture]})
+
+        self.assertIs(result, fixture)
+
+    def test_games_feed_skips_expired_stream_url_when_refreshing(self):
+        game = {
+            "league": "NHL",
+            "home_team": "BOS",
+            "away_team": "PIT",
+        }
+        expired = {
+            "fixture_name": "Pittsburgh-Penguins @ Boston-Bruins",
+            "fixture_id": "fixture-old",
+            "secure_url": "https://example.invalid/expired.m3u8",
+        }
+        refreshed = {
+            **expired,
+            "fixture_id": "fixture-new",
+            "secure_url": "https://example.invalid/refreshed.m3u8",
+        }
+
+        result = sports_scheduler.find_live_game(
+            game,
+            {"games": [expired, refreshed]},
+            excluded_urls={expired["secure_url"]},
+        )
+
+        self.assertIs(result, refreshed)
+
+    def test_fixture_refresh_requires_same_fixture_id(self):
+        fixture = {
+            "fixture_id": "fixture-123",
+            "secure_url": "https://example.invalid/refreshed.m3u8",
+        }
+        unrelated_fixture = {
+            "fixture_id": "fixture-456",
+            "secure_url": "https://example.invalid/other.m3u8",
+        }
+
+        result = sports_scheduler.find_fixture_by_id(
+            {"games": [unrelated_fixture, fixture]}, "fixture-123"
+        )
+
+        self.assertIs(result, fixture)
+
     def test_channel_fallback_requires_channel_id(self):
         feed = {
             "channels": [
@@ -323,6 +393,36 @@ class SportsFeedSelectionTests(unittest.TestCase):
         self.assertEqual(thread.call_args.kwargs["kwargs"]["sports_source"], "games")
         self.assertEqual(thread.call_args.kwargs["kwargs"]["selected_feed_id"], "fixture-123")
 
+    def test_sports_recording_uses_espn_broadcast_channel_when_fixture_is_unavailable(self):
+        game = {
+            "game_id": "game-2",
+            "league": "NHL",
+            "home_team": "BOS",
+            "away_team": "NYR",
+            "home_name": "Boston Bruins",
+            "away_name": "New York Rangers",
+            "broadcast_channels": ["NHL Network"],
+            "recording_state": "scheduled",
+        }
+        channel = {
+            "channel_name": "NHL Network",
+            "channel_id": "nhl-network",
+            "secure_url": "https://example.invalid/nhl-network.m3u8",
+        }
+
+        with (
+            patch.object(app, "load_team_schedule", return_value={"games": [game]}),
+            patch.object(app, "get_nufu_feed", return_value={"games": [], "channels": [channel]}),
+            patch.object(app, "set_sports_recording_data"),
+            patch.object(app.threading, "Thread") as thread,
+        ):
+            app.start_sports_recording("game-2")
+
+        thread.assert_called_once()
+        self.assertEqual(thread.call_args.kwargs["args"][0], channel["secure_url"])
+        self.assertEqual(thread.call_args.kwargs["kwargs"]["sports_source"], "channels")
+        self.assertEqual(thread.call_args.kwargs["kwargs"]["selected_feed_id"], "nhl-network")
+
     def test_espn_plus_broadcast_does_not_match_espn_channel(self):
         game = {**self.game, "broadcast_channels": ["ESPN+"]}
         feed = {
@@ -376,6 +476,56 @@ class SportsFeedSelectionTests(unittest.TestCase):
 
         self.assertEqual(first["game_id"], second["game_id"])
         self.assertNotEqual(first["start_at"], second["start_at"])
+
+    def test_espn_abbreviation_table_covers_every_supported_team(self):
+        self.assertEqual(
+            {
+                league: set(abbreviations)
+                for league, abbreviations in sports_scheduler.ESPN_TEAM_ABBREVIATIONS.items()
+            },
+            {league: set(teams) for league, teams in sports_scheduler.TEAMS.items()},
+        )
+        for league, abbreviations in sports_scheduler.ESPN_TEAM_ABBREVIATIONS.items():
+            for team_abbreviation, espn_abbreviation in abbreviations.items():
+                self.assertEqual(
+                    sports_scheduler.resolve_team(league, espn_abbreviation),
+                    team_abbreviation,
+                    f"{league} ESPN abbreviation {espn_abbreviation} should map to {team_abbreviation}",
+                )
+                self.assertEqual(
+                    sports_scheduler._espn_team_id(league, team_abbreviation),
+                    espn_abbreviation.lower(),
+                )
+
+    def test_san_jose_schedule_uses_espn_team_id_and_resolves_sj_abbreviation(self):
+        response = SimpleNamespace(
+            json=lambda: {"events": [{
+                "id": "san-jose-event",
+                "date": "2026-11-04T23:00:00Z",
+                "competitions": [{
+                    "competitors": [
+                        {"homeAway": "home", "team": {"abbreviation": "SJ"}},
+                        {"homeAway": "away", "team": {"abbreviation": "LAK"}},
+                    ],
+                    "status": {"type": {"state": "pre", "description": "Scheduled"}},
+                }],
+            }]},
+            raise_for_status=unittest.mock.Mock(),
+        )
+        now = datetime(2026, 11, 3, tzinfo=timezone.utc)
+
+        with patch.object(sports_scheduler.requests, "get", return_value=response) as get:
+            games = sports_scheduler.fetch_favorite_schedules(["NHL:SJS"], now=now)
+
+        self.assertEqual(
+            get.call_args.args[0],
+            "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/teams/sj/schedule",
+        )
+        self.assertEqual(get.call_args.kwargs["params"], {"season": 2027})
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0]["home_team"], "SJS")
+        self.assertEqual(games[0]["away_team"], "LAK")
+        self.assertEqual(games[0]["favorite_teams"], ["NHL:SJS"])
 
     def test_schedules_are_fetched_from_espn_for_selected_teams(self):
         def event(home, away, *, completed=False, broadcasts=None):
@@ -590,6 +740,43 @@ class SportsStatusTests(unittest.TestCase):
             "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/teams/bos/schedule"
         ))
 
+    def test_san_jose_status_lookup_uses_espn_team_id(self):
+        response = SimpleNamespace(
+            json=lambda: {"events": [{
+                "id": "san-jose-event",
+                "date": "2026-11-04T23:00:00Z",
+                "competitions": [{
+                    "competitors": [
+                        {"homeAway": "home", "team": {"abbreviation": "SJ"}},
+                        {"homeAway": "away", "team": {"abbreviation": "LAK"}},
+                    ],
+                    "status": {
+                        "type": {"state": "in", "description": "In Progress"},
+                        "period": 2,
+                        "displayClock": "10:00",
+                    },
+                }],
+            }]},
+            raise_for_status=unittest.mock.Mock(),
+        )
+        game = {
+            "game_id": "game-1",
+            "league": "NHL",
+            "favorite_teams": ["NHL:SJS"],
+            "home_team": "SJS",
+            "away_team": "LAK",
+            "start_at": "2026-11-04T23:00:00+00:00",
+        }
+
+        with patch.object(sports_scheduler.requests, "get", return_value=response) as get:
+            status = sports_scheduler.fetch_game_status(game)
+
+        self.assertEqual(status["event_id"], "san-jose-event")
+        self.assertEqual(
+            get.call_args.args[0],
+            "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/teams/sj/schedule",
+        )
+
     def test_active_sports_recording_stops_when_espn_reports_final(self):
         started = datetime(2026, 11, 2, 20, 0, tzinfo=timezone.utc)
         now = started + timedelta(hours=3)
@@ -681,9 +868,81 @@ class SportsStatusTests(unittest.TestCase):
 
 
 class SportsRecordingFallbackTests(unittest.TestCase):
+    def test_sports_recording_restarts_after_early_clean_ffmpeg_exit(self):
+        first_process = SimpleNamespace(stderr=[], returncode=0, wait=unittest.mock.Mock())
+        second_process = SimpleNamespace(stderr=[], returncode=0, wait=unittest.mock.Mock())
+        game = {
+            "game_id": "game-1",
+            "league": "NHL",
+            "home_team": "BOS",
+            "away_team": "NYR",
+            "broadcast_channels": ["NHL Network"],
+        }
+        refreshed_fixture = {
+            "fixture_id": "fixture-123",
+            "fixture_name": "Rangers at Bruins",
+            "secure_url": "https://example.invalid/refreshed.m3u8",
+        }
+        app.active_recordings.pop("sports-game-1", None)
+
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                patch.object(app, "settings", {"save_path": directory}),
+                patch.object(
+                    app.subprocess, "Popen",
+                    side_effect=[first_process, second_process],
+                ) as popen,
+                patch.object(app, "get_nufu_feed", return_value={"games": [refreshed_fixture]}),
+                patch.object(
+                    app.sports, "find_live_game", return_value=refreshed_fixture,
+                ),
+                patch.object(app, "set_sports_recording_data") as save_game,
+                patch.object(app, "load_schedules", return_value=[]),
+                patch.object(app, "log_ffmpeg"),
+                patch.object(app.time, "monotonic", side_effect=[0, 0, 10, 10, 10, 3600]),
+                patch.object(app.time, "sleep") as sleep,
+            ):
+                app.record_stream(
+                    "https://example.invalid/expired.m3u8",
+                    "Rangers at Bruins",
+                    3600,
+                    "sports-game-1",
+                    "NHL",
+                    sports_game=game,
+                    sports_source="games",
+                    selected_feed_id="fixture-123",
+                )
+
+        self.assertEqual(popen.call_count, 2)
+        input_urls = [
+            call.args[0][call.args[0].index("-i") + 1]
+            for call in popen.call_args_list
+        ]
+        self.assertEqual(
+            input_urls,
+            [
+                "https://example.invalid/expired.m3u8",
+                refreshed_fixture["secure_url"],
+            ],
+        )
+        output_paths = [
+            call.args[0][-1]
+            for call in popen.call_args_list
+        ]
+        self.assertNotEqual(output_paths[0], output_paths[1])
+        self.assertTrue(output_paths[1].endswith("_part02.mp4"))
+        sleep.assert_called_once_with(15)
+        self.assertEqual(save_game.call_args_list[-1].args[1]["recording_state"], "completed")
+        self.assertNotIn("sports-game-1", app.active_recordings)
+
     def test_fixture_recording_retries_on_broadcast_channel_after_failure(self):
         fixture_process = SimpleNamespace(stderr=[], returncode=1, wait=unittest.mock.Mock())
-        channel_process = SimpleNamespace(stderr=[], returncode=0, wait=unittest.mock.Mock())
+        def finish_game():
+            app.active_recordings["sports-game-1"]["stop_reason"] = "espn_final"
+
+        channel_process = SimpleNamespace(
+            stderr=[], returncode=0, wait=unittest.mock.Mock(side_effect=finish_game)
+        )
         channel = {
             "channel_id": "nhl-network",
             "channel_name": "NHL Network",
@@ -692,6 +951,8 @@ class SportsRecordingFallbackTests(unittest.TestCase):
         game = {
             "game_id": "game-1",
             "league": "NHL",
+            "home_team": "BOS",
+            "away_team": "NYR",
             "broadcast_channels": ["NHL Network"],
         }
         app.active_recordings.pop("sports-game-1", None)
@@ -703,11 +964,19 @@ class SportsRecordingFallbackTests(unittest.TestCase):
                     app.subprocess, "Popen",
                     side_effect=[fixture_process, channel_process],
                 ) as popen,
-                patch.object(app, "get_nufu_feed", return_value={"channels": [channel]}),
+                patch.object(app, "get_nufu_feed", return_value={
+                    "games": [{
+                        "fixture_id": "another-fixture",
+                        "fixture_name": "Bruins at Rangers",
+                        "secure_url": "https://example.invalid/another-fixture.m3u8",
+                    }],
+                    "channels": [channel],
+                }),
                 patch.object(app.sports, "find_broadcast_channel", return_value=channel),
                 patch.object(app, "set_sports_recording_data") as save_game,
                 patch.object(app, "load_schedules", return_value=[]),
                 patch.object(app, "log_ffmpeg"),
+                patch.object(app.time, "sleep"),
             ):
                 app.record_stream(
                     "https://example.invalid/fixture.m3u8",
@@ -730,7 +999,7 @@ class SportsRecordingFallbackTests(unittest.TestCase):
             channel["secure_url"],
         )
         self.assertEqual(save_game.call_args_list[-1].args[1]["recording_state"], "completed")
-        self.assertEqual(save_game.call_args_list[-1].args[1]["stop_reason"], "")
+        self.assertEqual(save_game.call_args_list[-1].args[1]["stop_reason"], "espn_final")
         self.assertTrue(any(
             call.args[1].get("selected_feed_id") == "nhl-network"
             for call in save_game.call_args_list
@@ -748,6 +1017,7 @@ class SportsRecordingFallbackTests(unittest.TestCase):
                 patch.object(app, "set_sports_recording_data"),
                 patch.object(app, "load_schedules", return_value=[]),
                 patch.object(app, "log_ffmpeg"),
+                patch.object(app.time, "monotonic", side_effect=[0, 0, 6 * 3600]),
             ):
                 app.record_stream(
                     "https://example.invalid/fixture.m3u8",
