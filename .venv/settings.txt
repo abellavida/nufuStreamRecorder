@@ -1,0 +1,3 @@
+gemini_key=""
+paid_api="https://nufu.tv/json/jcarter@abellavida.com"
+save_path="/home/jc3/Videos/Recordings"

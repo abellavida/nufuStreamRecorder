@@ -1,0 +1,14 @@
+{
+    "api_url": "https://nufu.tv/json/jcarter@abellavida.com",
+    "api_key": "AIzaSyAcQ7jF7QoPfkGQj1v-yWJsCezs1aoa8J4",
+    "m3u_url": "https://tvpass.org/playlist.m3u",
+    "save_path": "/home/jc3/Videos/Recordings",
+    "paid_api": "https://nufu.tv/json/jcarter@abellavida.com",
+    "sports_favorites": [
+        "NFL:NE",
+        "NHL:BOS",
+        "NHL:CAR",
+        "NHL:COL",
+        "NHL:SJS"
+    ]
+}

@@ -1,0 +1,157 @@
+{% extends "layout.html" %}
+{% block title %}Favorites{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-10">
+        <div class="card p-4 shadow" style="border: 1px solid var(--plex-orange);">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                <div>
+                    <h4 class="mb-2" style="color: var(--plex-orange); font-weight: 800;">
+                        <i class="fas fa-calendar-check me-2"></i>FAVORITE-TEAM SCHEDULE
+                    </h4>
+                    <p class="small mb-0">
+                        Choose NHL and NFL teams to follow. ESPN provides their schedules and available broadcast listings;
+                        the schedule refreshes every six hours.
+                    </p>
+                </div>
+            </div>
+
+            <form method="POST">
+                <input type="hidden" name="action" value="refresh">
+                <label for="sportsTeamSearch" class="form-label fw-bold" style="color: var(--plex-orange);">
+                    SELECT FAVORITE TEAMS
+                </label>
+                <div class="input-group">
+                    <input type="text" id="sportsTeamSearch" class="form-control"
+                           list="sportsTeamOptions" placeholder="Search NHL or NFL team">
+                    <datalist id="sportsTeamOptions">
+                        {% for team in sports_teams %}
+                        <option value="{{ team.id }} - {{ team.name }}"></option>
+                        {% endfor %}
+                    </datalist>
+                    <button type="button" id="addSportsTeam" class="btn btn-outline-warning">ADD TEAM</button>
+                </div>
+                <div id="sportsTeamError" class="form-text text-danger d-none">Choose a listed NHL or NFL team.</div>
+                <div id="favoriteSportsTeams" class="d-flex flex-wrap gap-2 mt-3"></div>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
+                    <div class="form-text">
+                        At game time the app prefers a matching <code>fixture_id</code> in NUFU's <code>games</code>
+                        feed, then falls back to the published channel using its <code>channel_id</code>.
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-rotate me-1"></i> SAVE FAVORITES &amp; REFRESH SCHEDULE
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card p-4 shadow mt-4" style="border: 1px solid var(--plex-orange);">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h5 class="mb-0" style="color: var(--plex-orange); font-weight: 800;">UPCOMING GAMES</h5>
+                {% if schedule_updated_at %}
+                <small>Schedule last refreshed: {{ schedule_updated_at }}</small>
+                {% endif %}
+            </div>
+            {% if schedule_error %}
+            <div class="alert alert-warning" role="alert">
+                <strong>Unable to refresh published sports schedules.</strong><br>{{ schedule_error }}
+            </div>
+            {% endif %}
+            {% if team_games %}
+            <div class="table-responsive">
+                <table class="table table-dark table-sm align-middle mb-0">
+                    <thead>
+                        <tr><th>LEAGUE / GAME</th><th>DATE / LOCAL</th><th>RECORDING</th><th>STREAM SOURCE</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for game in team_games %}
+                        <tr>
+                            <td>{{ game.league }} · {{ game.away_name }} @ {{ game.home_name }}</td>
+                            <td>{{ game.game_date }} {{ game.game_time }}</td>
+                            <td>
+                                {% if game.recording_state == 'recording' %}Recording
+                                {% elif game.recording_state == 'scheduled' %}Queued
+                                {% elif game.recording_state == 'completed' %}Completed
+                                {% elif game.recording_state == 'missed' %}Missed
+                                {% elif game.recording_state == 'failed' %}Failed
+                                {% else %}{{ game.recording_state or 'Queued' }}{% endif %}
+                            </td>
+                            <td>
+                                {% if game.source_used == 'games' %}NUFU games feed
+                                {% elif game.source_used == 'channels' %}{{ game.broadcast_channels|join(', ') }}
+                                {% else %}Waiting for start{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% elif sports_favorites %}
+            <p class="mb-0">No games are in the current schedule yet. The schedule refresh runs in the background.</p>
+            {% else %}
+            <p class="mb-0">Add favorite NHL or NFL teams above to generate their published schedules.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    const sportsTeams = {{ sports_teams|tojson }};
+    let favoriteSportsTeams = {{ sports_favorites|tojson }};
+    const teamSearch = document.getElementById('sportsTeamSearch');
+    const teamList = document.getElementById('favoriteSportsTeams');
+    const teamError = document.getElementById('sportsTeamError');
+
+    function renderFavoriteSportsTeams() {
+        teamList.replaceChildren();
+        favoriteSportsTeams.forEach(id => {
+            const team = sportsTeams.find(candidate => candidate.id === id);
+            if (!team) return;
+
+            const chip = document.createElement('span');
+            chip.className = 'badge text-bg-warning d-inline-flex align-items-center gap-2';
+            chip.append(document.createTextNode(`${team.league} · ${team.name}`));
+
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn-close';
+            remove.setAttribute('aria-label', `Remove ${team.name}`);
+            remove.addEventListener('click', () => {
+                favoriteSportsTeams = favoriteSportsTeams.filter(value => value !== id);
+                renderFavoriteSportsTeams();
+            });
+            chip.append(remove);
+            teamList.append(chip);
+
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'sports_favorites';
+            hidden.value = id;
+            teamList.append(hidden);
+        });
+    }
+
+    document.getElementById('addSportsTeam').addEventListener('click', () => {
+        const team = sportsTeams.find(candidate =>
+            `${candidate.id} - ${candidate.name}` === teamSearch.value
+        );
+        if (!team) {
+            teamError.classList.remove('d-none');
+            return;
+        }
+        teamError.classList.add('d-none');
+        if (!favoriteSportsTeams.includes(team.id)) favoriteSportsTeams.push(team.id);
+        teamSearch.value = '';
+        renderFavoriteSportsTeams();
+    });
+
+    teamSearch.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            document.getElementById('addSportsTeam').click();
+        }
+    });
+    renderFavoriteSportsTeams();
+</script>
+{% endblock %}
