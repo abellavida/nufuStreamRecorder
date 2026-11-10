@@ -294,6 +294,22 @@ class SportsFeedSelectionTests(unittest.TestCase):
 
         self.assertIs(result, fixture)
 
+    def test_games_feed_matches_city_only_fixture_names_in_reversed_order(self):
+        game = {
+            "league": "NHL",
+            "home_team": "MIN",
+            "away_team": "SJS",
+        }
+        fixture = {
+            "fixture_name": "Minnesota @ SanJose",
+            "fixture_id": "manual-fixture-home",
+            "secure_url": "https://example.invalid/game",
+        }
+
+        result = sports_scheduler.find_live_game(game, {"games": [fixture]})
+
+        self.assertIs(result, fixture)
+
     def test_games_feed_skips_expired_stream_url_when_refreshing(self):
         game = {
             "league": "NHL",
@@ -457,6 +473,32 @@ class SportsFeedSelectionTests(unittest.TestCase):
         }
 
         self.assertIsNone(sports_scheduler.find_broadcast_channel(game, feed))
+
+    def test_espn_broadcast_abbreviations_match_nufu_channel_names(self):
+        game = {
+            "league": "NHL",
+            "home_team": "MIN",
+            "away_team": "SJS",
+            "broadcast_channels": ["NHL Net", "NBC Sports BA"],
+        }
+        feed = {
+            "channels": [
+                {
+                    "channel_name": "NHL Network",
+                    "channel_id": "nhl-network",
+                    "secure_url": "https://example.invalid/nhl-network",
+                },
+                {
+                    "channel_name": "NBC Sports Bay Area",
+                    "channel_id": "nbc-sports-bay-area",
+                    "secure_url": "https://example.invalid/nbc-sports-bay-area",
+                },
+            ]
+        }
+
+        result = sports_scheduler.find_broadcast_channel(game, feed)
+
+        self.assertEqual(result["channel_id"], "nhl-network")
 
     def test_game_identity_survives_start_time_change_on_same_date(self):
         now = datetime(2026, 10, 23, tzinfo=timezone.utc)

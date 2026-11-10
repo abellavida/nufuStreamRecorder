@@ -30,7 +30,7 @@ TEAMS = {
         "EDM": ("Edmonton Oilers", "Oilers"),
         "FLA": ("Florida Panthers", "Panthers"),
         "LAK": ("Los Angeles Kings", "LA Kings", "Kings"),
-        "MIN": ("Minnesota Wild", "Wild"),
+        "MIN": ("Minnesota Wild", "Minnesota", "Wild"),
         "MTL": ("Montreal Canadiens", "Canadiens", "Habs"),
         "NSH": ("Nashville Predators", "Predators", "Preds"),
         "NJD": ("New Jersey Devils", "NJ Devils", "Devils"),
@@ -40,7 +40,7 @@ TEAMS = {
         "PHI": ("Philadelphia Flyers", "Flyers"),
         "PIT": ("Pittsburgh Penguins", "Penguins", "Pens"),
         "SEA": ("Seattle Kraken", "Kraken"),
-        "SJS": ("San Jose Sharks", "SJ", "SJ Sharks", "Sharks"),
+        "SJS": ("San Jose Sharks", "San Jose", "SJ", "SJ Sharks", "Sharks"),
         "STL": ("St. Louis Blues", "St Louis Blues", "Blues"),
         "TBL": ("Tampa Bay Lightning", "Lightning", "Bolts"),
         "TOR": ("Toronto Maple Leafs", "Maple Leafs", "Leafs"),
@@ -133,7 +133,12 @@ def normalize_text(value):
 
 def _normalize_broadcast_name(value):
     normalized = re.sub(r"[^a-z0-9+]+", " ", str(value).lower()).strip()
-    return re.sub(r"\s*\+\s*", "+", normalized)
+    normalized = re.sub(r"\s*\+\s*", "+", normalized)
+    aliases = {
+        "nhl net": "nhl network",
+        "nbc sports ba": "nbc sports bay area",
+    }
+    return aliases.get(normalized, normalized)
 
 
 def resolve_team(league, value):

@@ -1,6 +1,6 @@
 {
-    "updated_at": "2026-11-06T14:35:06.200465+00:00",
-    "refresh_attempt_at": "2026-11-06T14:35:06.200473+00:00",
+    "updated_at": "2026-11-10T11:15:01.657667+00:00",
+    "refresh_attempt_at": "2026-11-10T11:15:01.657680+00:00",
     "refresh_attempt_favorites": [
         "NFL:NE",
         "NHL:BOS",
@@ -16,26 +16,6 @@
         "NHL:SJS"
     ],
     "games": [
-        {
-            "game_id": "efadfc719b6aa4d19f42",
-            "league": "NFL",
-            "espn_event_id": "401873049",
-            "favorite_teams": [
-                "NFL:NE"
-            ],
-            "recording_state": "scheduled",
-            "home_team": "NE",
-            "away_team": "GB",
-            "home_name": "New England Patriots",
-            "away_name": "Green Bay Packers",
-            "start_at": "2026-11-08T21:25:00+00:00",
-            "game_date": "2026-11-08",
-            "game_time": "16:25",
-            "broadcast_channels": [
-                "Fox"
-            ],
-            "sources": []
-        },
         {
             "game_id": "329d7c041698077a7cf0",
             "league": "NFL",
@@ -176,25 +156,21 @@
             "sources": []
         },
         {
-            "game_id": "f15c01e8dc059eb92fcd",
-            "league": "NHL",
-            "espn_event_id": "401892674",
+            "game_id": "e3ee1b2f992ade264e57",
+            "league": "NFL",
+            "espn_event_id": "401873180",
             "favorite_teams": [
-                "NHL:BOS"
+                "NFL:NE"
             ],
             "recording_state": "scheduled",
-            "home_team": "BOS",
-            "away_team": "FLA",
-            "home_name": "Boston Bruins",
-            "away_name": "Florida Panthers",
-            "start_at": "2026-11-08T18:00:00+00:00",
-            "game_date": "2026-11-08",
-            "game_time": "13:00",
-            "broadcast_channels": [
-                "NHL Net",
-                "Scripps Sports",
-                "NESN"
-            ],
+            "home_team": "NE",
+            "away_team": "MIA",
+            "home_name": "New England Patriots",
+            "away_name": "Miami Dolphins",
+            "start_at": "2027-01-10T05:00:00+00:00",
+            "game_date": "2027-01-10",
+            "game_time": "00:00",
+            "broadcast_channels": [],
             "sources": []
         },
         {
@@ -278,8 +254,7 @@
             "game_date": "2026-11-18",
             "game_time": "19:30",
             "broadcast_channels": [
-                "TNT",
-                "truTV"
+                "TNT"
             ],
             "sources": []
         },
@@ -507,8 +482,7 @@
             "game_date": "2026-12-15",
             "game_time": "19:00",
             "broadcast_channels": [
-                "TNT",
-                "truTV"
+                "TNT"
             ],
             "sources": []
         },
@@ -713,24 +687,43 @@
             "sources": []
         },
         {
-            "game_id": "7f5eb94fb6c99c268272",
+            "game_id": "b5e4984aebdbf06efdcf",
             "league": "NHL",
-            "espn_event_id": "401892668",
+            "espn_event_id": "401893082",
             "favorite_teams": [
-                "NHL:CAR"
+                "NHL:BOS"
             ],
             "recording_state": "scheduled",
-            "home_team": "CAR",
-            "away_team": "CHI",
-            "home_name": "Carolina Hurricanes",
-            "away_name": "Chicago Blackhawks",
-            "start_at": "2026-11-08T01:00:00+00:00",
-            "game_date": "2026-11-07",
-            "game_time": "20:00",
+            "home_team": "MTL",
+            "away_team": "BOS",
+            "home_name": "Montreal Canadiens",
+            "away_name": "Boston Bruins",
+            "start_at": "2027-01-07T00:30:00+00:00",
+            "game_date": "2027-01-06",
+            "game_time": "19:30",
             "broadcast_channels": [
-                "ESPN+",
-                "CHSN",
-                "CARNHL"
+                "TNT",
+                "truTV"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "6d3928fa1bfb3f4c719d",
+            "league": "NHL",
+            "espn_event_id": "401893107",
+            "favorite_teams": [
+                "NHL:BOS"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "DET",
+            "away_team": "BOS",
+            "home_name": "Detroit Red Wings",
+            "away_name": "Boston Bruins",
+            "start_at": "2027-01-10T00:00:00+00:00",
+            "game_date": "2027-01-09",
+            "game_time": "19:00",
+            "broadcast_channels": [
+                "DSN"
             ],
             "sources": []
         },
@@ -1202,24 +1195,43 @@
             "sources": []
         },
         {
-            "game_id": "114e8844763b12ee0d8e",
+            "game_id": "9edf89a324a68ba95443",
             "league": "NHL",
-            "espn_event_id": "401892671",
+            "espn_event_id": "401893090",
             "favorite_teams": [
-                "NHL:COL"
+                "NHL:CAR"
             ],
             "recording_state": "scheduled",
-            "home_team": "COL",
-            "away_team": "DET",
-            "home_name": "Colorado Avalanche",
-            "away_name": "Detroit Red Wings",
-            "start_at": "2026-11-08T02:00:00+00:00",
-            "game_date": "2026-11-07",
-            "game_time": "21:00",
+            "home_team": "CAR",
+            "away_team": "PIT",
+            "home_name": "Carolina Hurricanes",
+            "away_name": "Pittsburgh Penguins",
+            "start_at": "2027-01-08T00:00:00+00:00",
+            "game_date": "2027-01-07",
+            "game_time": "19:00",
             "broadcast_channels": [
-                "ESPN+",
-                "DSN",
-                "Altitude Sports"
+                "CARNHL"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "ef29e450f684288a7725",
+            "league": "NHL",
+            "espn_event_id": "401893104",
+            "favorite_teams": [
+                "NHL:CAR"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "BUF",
+            "away_team": "CAR",
+            "home_name": "Buffalo Sabres",
+            "away_name": "Carolina Hurricanes",
+            "start_at": "2027-01-10T00:00:00+00:00",
+            "game_date": "2027-01-09",
+            "game_time": "19:00",
+            "broadcast_channels": [
+                "MSGB",
+                "CARNHL"
             ],
             "sources": []
         },
@@ -1299,15 +1311,14 @@
             "away_team": "COL",
             "home_name": "Utah Mammoth",
             "away_name": "Colorado Avalanche",
-            "start_at": "2026-11-19T02:00:00+00:00",
+            "start_at": "2026-11-19T03:00:00+00:00",
             "game_date": "2026-11-18",
-            "game_time": "21:00",
+            "game_time": "22:00",
             "broadcast_channels": [
-                "ESPN+",
-                "Utah 16",
-                "Altitude Sports",
                 "TNT",
-                "Mammoth+"
+                "Utah 16",
+                "Mammoth+",
+                "Altitude Sports"
             ],
             "sources": []
         },
@@ -1687,69 +1698,44 @@
             "sources": []
         },
         {
-            "game_id": "6e60a8e4c8755d88eef1",
+            "game_id": "06039ff54a304d421a02",
             "league": "NHL",
-            "espn_event_id": "401892660",
+            "espn_event_id": "401893083",
             "favorite_teams": [
-                "NHL:SJS"
+                "NHL:COL"
             ],
             "recording_state": "scheduled",
-            "home_team": "MIN",
-            "away_team": "SJS",
-            "home_name": "Minnesota Wild",
-            "away_name": "San Jose Sharks",
-            "start_at": "2026-11-07T01:00:00+00:00",
-            "game_date": "2026-11-06",
-            "game_time": "20:00",
+            "home_team": "COL",
+            "away_team": "OTT",
+            "home_name": "Colorado Avalanche",
+            "away_name": "Ottawa Senators",
+            "start_at": "2027-01-07T02:30:00+00:00",
+            "game_date": "2027-01-06",
+            "game_time": "21:30",
             "broadcast_channels": [
-                "NHL Net",
-                "NBC Sports BA",
-                "MINNHL",
-                "KSTP"
+                "Altitude Sports"
             ],
             "sources": []
         },
         {
-            "game_id": "6f56351eb973df494bba",
+            "game_id": "61796e1fa05971614ad8",
             "league": "NHL",
-            "espn_event_id": "401892669",
+            "espn_event_id": "401893098",
             "favorite_teams": [
-                "NHL:SJS"
+                "NHL:COL"
             ],
             "recording_state": "scheduled",
-            "home_team": "DAL",
-            "away_team": "SJS",
-            "home_name": "Dallas Stars",
-            "away_name": "San Jose Sharks",
-            "start_at": "2026-11-08T01:00:00+00:00",
-            "game_date": "2026-11-07",
-            "game_time": "20:00",
+            "home_team": "COL",
+            "away_team": "SEA",
+            "home_name": "Colorado Avalanche",
+            "away_name": "Seattle Kraken",
+            "start_at": "2027-01-09T02:00:00+00:00",
+            "game_date": "2027-01-08",
+            "game_time": "21:00",
             "broadcast_channels": [
-                "ESPN+",
-                "NBC Sports BA",
+                "Altitude Sports",
+                "KONG",
                 "Prime Video (Local)"
-            ],
-            "sources": []
-        },
-        {
-            "game_id": "7793eade97245218786f",
-            "league": "NHL",
-            "espn_event_id": "401892682",
-            "favorite_teams": [
-                "NHL:SJS"
-            ],
-            "recording_state": "scheduled",
-            "home_team": "SJS",
-            "away_team": "NYI",
-            "home_name": "San Jose Sharks",
-            "away_name": "New York Islanders",
-            "start_at": "2026-11-10T03:00:00+00:00",
-            "game_date": "2026-11-09",
-            "game_time": "22:00",
-            "broadcast_channels": [
-                "ESPN+",
-                "MSGSN",
-                "NBC Sports BA"
             ],
             "sources": []
         },
@@ -2279,6 +2265,69 @@
             "game_time": "22:00",
             "broadcast_channels": [
                 "MSGSN",
+                "NBC Sports BA"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "32f3e87835b38decd51a",
+            "league": "NHL",
+            "espn_event_id": "401893085",
+            "favorite_teams": [
+                "NHL:SJS"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "SJS",
+            "away_team": "DAL",
+            "home_name": "San Jose Sharks",
+            "away_name": "Dallas Stars",
+            "start_at": "2027-01-07T03:00:00+00:00",
+            "game_date": "2027-01-06",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "NBC Sports BA",
+                "Prime Video (Local)"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "83ea77346034cf49b17e",
+            "league": "NHL",
+            "espn_event_id": "401893100",
+            "favorite_teams": [
+                "NHL:SJS"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "SJS",
+            "away_team": "WSH",
+            "home_name": "San Jose Sharks",
+            "away_name": "Washington Capitals",
+            "start_at": "2027-01-09T03:00:00+00:00",
+            "game_date": "2027-01-08",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "MNMT2",
+                "NBC Sports BA"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "61d7c4938aefa9ec2867",
+            "league": "NHL",
+            "espn_event_id": "401893113",
+            "favorite_teams": [
+                "NHL:SJS"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "SJS",
+            "away_team": "NYR",
+            "home_name": "San Jose Sharks",
+            "away_name": "New York Rangers",
+            "start_at": "2027-01-10T03:00:00+00:00",
+            "game_date": "2027-01-09",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "MSG",
                 "NBC Sports BA"
             ],
             "sources": []
