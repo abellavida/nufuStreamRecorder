@@ -134,17 +134,60 @@ class SportsPageTests(unittest.TestCase):
 
         refresh.assert_called_once_with()
 
-    def test_settings_page_does_not_require_an_ai_key(self):
+    def test_settings_page_offers_optional_masked_gemini_key(self):
         with patch.object(
             app, "load_settings",
-            return_value={"paid_api": "https://example.invalid/feed", "save_path": "/recordings"},
+            return_value={
+                "paid_api": "https://example.invalid/feed",
+                "save_path": "/recordings",
+                "gemini_key_configured": True,
+            },
         ):
             response = self.client.get("/settings")
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn(b"GROQ API KEY", response.data)
+        self.assertIn(b'name="gemini_key"', response.data)
+        self.assertIn(b'type="password"', response.data)
+        self.assertIn(b"Saved locally; leave blank to keep it", response.data)
         self.assertNotIn(b'name="groq_key"', response.data)
-        self.assertNotIn(b"Gemini", response.data)
+
+    def test_gemini_key_is_persisted_without_exposing_it_in_loaded_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings_file = Path(directory) / "settings.json"
+            with (
+                patch.object(app, "SETTINGS_FILE", str(settings_file)),
+                patch.object(app, "SETTINGS_TEXT_FILE", str(Path(directory) / "settings.txt")),
+            ):
+                app.save_app_settings({
+                    "paid_api": "https://example.invalid/feed",
+                    "save_path": "/recordings",
+                    "gemini_key": "test-gemini-key",
+                    "clear_gemini_key": False,
+                })
+                loaded = app.load_settings()
+                self.assertTrue(loaded["gemini_key_configured"])
+                self.assertNotIn("gemini_key", loaded)
+
+                app.save_app_settings({
+                    "paid_api": "https://example.invalid/new-feed",
+                    "save_path": "/new-recordings",
+                    "gemini_key": "",
+                    "clear_gemini_key": False,
+                })
+                self.assertEqual(json.loads(settings_file.read_text())["gemini_key"],
+                                 "test-gemini-key")
+                settings_page = self.client.get("/settings")
+                self.assertEqual(settings_page.status_code, 200)
+                self.assertNotIn(b"test-gemini-key", settings_page.data)
+
+                app.save_app_settings({
+                    "paid_api": "https://example.invalid/new-feed",
+                    "save_path": "/new-recordings",
+                    "gemini_key": "",
+                    "clear_gemini_key": True,
+                })
+                self.assertNotIn("gemini_key", json.loads(settings_file.read_text()))
+                self.assertFalse(app.load_settings()["gemini_key_configured"])
 
     def test_dashboard_shows_next_seven_days_with_explicit_visitor_home_order(self):
         now = datetime(2026, 10, 29, 17, 0, tzinfo=timezone.utc)
@@ -195,6 +238,38 @@ class SportsPageTests(unittest.TestCase):
         self.assertNotIn(b"Later Visitor @ Later Home", response.data)
         self.assertIn(game_start.astimezone().strftime("%Y-%m-%d").encode(), response.data)
         self.assertIn(game_start.astimezone().strftime("%I:%M %p").encode(), response.data)
+
+    def test_dashboard_lists_recordings_in_sport_subfolders(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "manual.mp4").write_bytes(b"manual")
+            hockey = root / "Hockey"
+            hockey.mkdir()
+            (hockey / "NHL_game.mp4").write_bytes(b"hockey")
+            football = root / "Football"
+            football.mkdir()
+            (football / "NFL_game.MP4").write_bytes(b"football")
+
+            with (
+                patch.object(app, "load_settings", return_value={
+                    "paid_api": "https://example.invalid/feed",
+                    "save_path": directory,
+                }),
+                patch.object(app, "load_schedules", return_value=[]),
+                patch.object(app, "sports_favorites", return_value=[]),
+                patch.object(app, "load_team_schedule", return_value={"games": []}),
+                patch.object(app.requests, "get", return_value=SimpleNamespace(
+                    json=lambda: {"games": [], "channels": []},
+                )),
+                patch.object(app, "active_recordings", {}),
+                patch.object(app, "video_duration_display", return_value="1 MIN"),
+            ):
+                response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"manual.mp4", response.data)
+        self.assertIn(b"Hockey/NHL_game.mp4", response.data)
+        self.assertIn(b"Football/NFL_game.MP4", response.data)
 
 
 class VideoDurationTests(unittest.TestCase):
@@ -910,6 +985,76 @@ class SportsStatusTests(unittest.TestCase):
 
 
 class SportsRecordingFallbackTests(unittest.TestCase):
+    def test_sports_recordings_use_league_folders_and_other_recordings_stay_at_root(self):
+        cases = (
+            ({"league": "NHL"}, "Hockey"),
+            ({"league": "NFL"}, "Football"),
+            ({"league": "MLB"}, "Baseball"),
+            ({"league": "MLS"}, None),
+            (None, None),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, (sports_game, expected_folder) in enumerate(cases):
+                task_uuid = f"manual-{index}"
+                with (
+                    patch.object(app, "settings", {"save_path": directory}),
+                    patch.object(app.subprocess, "Popen", return_value=SimpleNamespace(
+                        stderr=[],
+                        returncode=0,
+                        wait=unittest.mock.Mock(),
+                    )) as popen,
+                    patch.object(app, "load_schedules", return_value=[]),
+                    patch.object(app, "log_ffmpeg"),
+                    patch.object(app.time, "monotonic", side_effect=[0, 0, 3600]),
+                ):
+                    app.record_stream(
+                        "https://example.invalid/game.m3u8",
+                        "League game",
+                        3600,
+                        task_uuid,
+                        sports_game=sports_game,
+                    )
+
+                output_path = Path(popen.call_args.args[0][-1])
+                expected_parent = Path(directory) / expected_folder if expected_folder else Path(directory)
+                self.assertEqual(output_path.parent, expected_parent)
+
+    def test_unplayable_retry_part_is_removed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bad-part.mp4"
+            path.write_bytes(b"partial")
+            with patch.object(
+                app.subprocess, "run",
+                side_effect=app.subprocess.CalledProcessError(1, ["ffprobe"]),
+            ):
+                app.discard_unplayable_recording_part(str(path))
+
+            self.assertFalse(path.exists())
+
+    def test_valid_retry_part_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "valid-part.mp4"
+            path.write_bytes(b"valid")
+            with patch.object(
+                app.subprocess, "run",
+                return_value=SimpleNamespace(stdout="25.0\n"),
+            ):
+                app.discard_unplayable_recording_part(str(path))
+
+            self.assertTrue(path.exists())
+
+    def test_retry_part_is_preserved_when_ffprobe_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "unchecked-part.mp4"
+            path.write_bytes(b"partial")
+            with patch.object(
+                app.subprocess, "run",
+                side_effect=FileNotFoundError("ffprobe"),
+            ):
+                app.discard_unplayable_recording_part(str(path))
+
+            self.assertTrue(path.exists())
+
     def test_sports_recording_restarts_after_early_clean_ffmpeg_exit(self):
         first_process = SimpleNamespace(stderr=[], returncode=0, wait=unittest.mock.Mock())
         second_process = SimpleNamespace(stderr=[], returncode=0, wait=unittest.mock.Mock())

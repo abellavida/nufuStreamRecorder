@@ -1,19 +1,21 @@
 {
-    "updated_at": "2026-11-10T11:15:01.657667+00:00",
-    "refresh_attempt_at": "2026-11-10T11:15:01.657680+00:00",
+    "updated_at": "2026-11-14T05:28:18.719401+00:00",
+    "refresh_attempt_at": "2026-11-14T05:28:18.719413+00:00",
     "refresh_attempt_favorites": [
         "NFL:NE",
         "NHL:BOS",
         "NHL:CAR",
         "NHL:COL",
-        "NHL:SJS"
+        "NHL:SJS",
+        "NHL:VGK"
     ],
     "favorites": [
         "NFL:NE",
         "NHL:BOS",
         "NHL:CAR",
         "NHL:COL",
-        "NHL:SJS"
+        "NHL:SJS",
+        "NHL:VGK"
     ],
     "games": [
         {
@@ -171,27 +173,6 @@
             "game_date": "2027-01-10",
             "game_time": "00:00",
             "broadcast_channels": [],
-            "sources": []
-        },
-        {
-            "game_id": "5d5d36cbf59db645786b",
-            "league": "NHL",
-            "espn_event_id": "401892696",
-            "favorite_teams": [
-                "NHL:BOS"
-            ],
-            "recording_state": "scheduled",
-            "home_team": "BOS",
-            "away_team": "MTL",
-            "home_name": "Boston Bruins",
-            "away_name": "Montreal Canadiens",
-            "start_at": "2026-11-13T00:00:00+00:00",
-            "game_date": "2026-11-12",
-            "game_time": "19:00",
-            "broadcast_channels": [
-                "ESPN+",
-                "NESN"
-            ],
             "sources": []
         },
         {
@@ -503,7 +484,8 @@
             "game_time": "19:00",
             "broadcast_channels": [
                 "Blues App",
-                "BN+"
+                "BN+",
+                "ABC32"
             ],
             "sources": []
         },
@@ -728,25 +710,23 @@
             "sources": []
         },
         {
-            "game_id": "2005904542e181fcf9ba",
+            "game_id": "daf6e63c511625c4412e",
             "league": "NHL",
-            "espn_event_id": "401891808",
+            "espn_event_id": "401893120",
             "favorite_teams": [
+                "NHL:BOS",
                 "NHL:CAR"
             ],
             "recording_state": "scheduled",
-            "home_team": "SEA",
+            "home_team": "BOS",
             "away_team": "CAR",
-            "home_name": "Seattle Kraken",
+            "home_name": "Boston Bruins",
             "away_name": "Carolina Hurricanes",
-            "start_at": "2026-11-12T17:00:00+00:00",
-            "game_date": "2026-11-12",
-            "game_time": "12:00",
+            "start_at": "2027-01-13T00:00:00+00:00",
+            "game_date": "2027-01-12",
+            "game_time": "19:00",
             "broadcast_channels": [
-                "NHL Net",
-                "CARNHL",
-                "KONG",
-                "Prime Video (Local)"
+                "CARNHL"
             ],
             "sources": []
         },
@@ -938,7 +918,8 @@
             "game_date": "2026-12-05",
             "game_time": "19:00",
             "broadcast_channels": [
-                "CARNHL"
+                "CARNHL",
+                "WRAL-TV"
             ],
             "sources": []
         },
@@ -1022,7 +1003,8 @@
             "game_time": "21:00",
             "broadcast_channels": [
                 "CARNHL",
-                "Utah 16"
+                "Utah 16",
+                "Mammoth+"
             ],
             "sources": []
         },
@@ -1053,7 +1035,8 @@
             "league": "NHL",
             "espn_event_id": "401892982",
             "favorite_teams": [
-                "NHL:CAR"
+                "NHL:CAR",
+                "NHL:VGK"
             ],
             "recording_state": "scheduled",
             "home_team": "VGK",
@@ -1085,7 +1068,8 @@
             "game_date": "2026-12-26",
             "game_time": "19:00",
             "broadcast_channels": [
-                "CARNHL"
+                "CARNHL",
+                "WRAL-TV"
             ],
             "sources": []
         },
@@ -1168,7 +1152,8 @@
             "game_time": "19:00",
             "broadcast_channels": [
                 "Scripps Sports",
-                "CARNHL"
+                "CARNHL",
+                "WRAL-TV"
             ],
             "sources": []
         },
@@ -1232,48 +1217,6 @@
             "broadcast_channels": [
                 "MSGB",
                 "CARNHL"
-            ],
-            "sources": []
-        },
-        {
-            "game_id": "4063ff8cc33dd8d609f5",
-            "league": "NHL",
-            "espn_event_id": "401892683",
-            "favorite_teams": [
-                "NHL:COL"
-            ],
-            "recording_state": "scheduled",
-            "home_team": "TOR",
-            "away_team": "COL",
-            "home_name": "Toronto Maple Leafs",
-            "away_name": "Colorado Avalanche",
-            "start_at": "2026-11-11T00:00:00+00:00",
-            "game_date": "2026-11-10",
-            "game_time": "19:00",
-            "broadcast_channels": [
-                "ESPN+",
-                "Altitude Sports"
-            ],
-            "sources": []
-        },
-        {
-            "game_id": "42377d75a0400a211e08",
-            "league": "NHL",
-            "espn_event_id": "401892698",
-            "favorite_teams": [
-                "NHL:COL"
-            ],
-            "recording_state": "scheduled",
-            "home_team": "OTT",
-            "away_team": "COL",
-            "home_name": "Ottawa Senators",
-            "away_name": "Colorado Avalanche",
-            "start_at": "2026-11-13T00:00:00+00:00",
-            "game_date": "2026-11-12",
-            "game_time": "19:00",
-            "broadcast_channels": [
-                "ESPN+",
-                "Altitude Sports"
             ],
             "sources": []
         },
@@ -1540,7 +1483,8 @@
             "game_time": "21:00",
             "broadcast_channels": [
                 "Utah 16",
-                "Altitude Sports"
+                "Altitude Sports",
+                "Mammoth+"
             ],
             "sources": []
         },
@@ -1660,7 +1604,8 @@
             "league": "NHL",
             "espn_event_id": "401893059",
             "favorite_teams": [
-                "NHL:COL"
+                "NHL:COL",
+                "NHL:VGK"
             ],
             "recording_state": "scheduled",
             "home_team": "VGK",
@@ -1681,7 +1626,8 @@
             "league": "NHL",
             "espn_event_id": "401893070",
             "favorite_teams": [
-                "NHL:COL"
+                "NHL:COL",
+                "NHL:VGK"
             ],
             "recording_state": "scheduled",
             "home_team": "COL",
@@ -1740,23 +1686,45 @@
             "sources": []
         },
         {
-            "game_id": "b454f4ef07575d9d206d",
+            "game_id": "ede313cddedd8f42749d",
             "league": "NHL",
-            "espn_event_id": "401892695",
+            "espn_event_id": "401893115",
             "favorite_teams": [
-                "NHL:SJS"
+                "NHL:COL"
             ],
             "recording_state": "scheduled",
-            "home_team": "SJS",
-            "away_team": "PIT",
-            "home_name": "San Jose Sharks",
-            "away_name": "Pittsburgh Penguins",
-            "start_at": "2026-11-12T03:00:00+00:00",
-            "game_date": "2026-11-11",
-            "game_time": "22:00",
+            "home_team": "COL",
+            "away_team": "NSH",
+            "home_name": "Colorado Avalanche",
+            "away_name": "Nashville Predators",
+            "start_at": "2027-01-11T01:00:00+00:00",
+            "game_date": "2027-01-10",
+            "game_time": "20:00",
             "broadcast_channels": [
+                "Scripps Sports",
+                "Altitude Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "c0128aa3a95b168ae397",
+            "league": "NHL",
+            "espn_event_id": "401893122",
+            "favorite_teams": [
+                "NHL:COL"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "PIT",
+            "away_team": "COL",
+            "home_name": "Pittsburgh Penguins",
+            "away_name": "Colorado Avalanche",
+            "start_at": "2027-01-13T00:00:00+00:00",
+            "game_date": "2027-01-12",
+            "game_time": "19:00",
+            "broadcast_channels": [
+                "Disney+",
                 "ESPN+",
-                "NBC Sports BA"
+                "Hulu"
             ],
             "sources": []
         },
@@ -1778,7 +1746,8 @@
             "broadcast_channels": [
                 "ESPN+",
                 "NBC Sports BA",
-                "Utah 16"
+                "Utah 16",
+                "Mammoth+"
             ],
             "sources": []
         },
@@ -1898,7 +1867,8 @@
             "league": "NHL",
             "espn_event_id": "401892805",
             "favorite_teams": [
-                "NHL:SJS"
+                "NHL:SJS",
+                "NHL:VGK"
             ],
             "recording_state": "scheduled",
             "home_team": "SJS",
@@ -2088,7 +2058,8 @@
             "league": "NHL",
             "espn_event_id": "401892945",
             "favorite_teams": [
-                "NHL:SJS"
+                "NHL:SJS",
+                "NHL:VGK"
             ],
             "recording_state": "scheduled",
             "home_team": "VGK",
@@ -2151,7 +2122,8 @@
             "league": "NHL",
             "espn_event_id": "401893004",
             "favorite_teams": [
-                "NHL:SJS"
+                "NHL:SJS",
+                "NHL:VGK"
             ],
             "recording_state": "scheduled",
             "home_team": "SJS",
@@ -2179,9 +2151,9 @@
             "away_team": "SJS",
             "home_name": "Winnipeg Jets",
             "away_name": "San Jose Sharks",
-            "start_at": "2026-12-29T00:30:00+00:00",
+            "start_at": "2026-12-29T01:00:00+00:00",
             "game_date": "2026-12-28",
-            "game_time": "19:30",
+            "game_time": "20:00",
             "broadcast_channels": [
                 "NBC Sports BA"
             ],
@@ -2307,7 +2279,8 @@
             "game_time": "22:00",
             "broadcast_channels": [
                 "MNMT2",
-                "NBC Sports BA"
+                "NBC Sports BA",
+                "MNMT"
             ],
             "sources": []
         },
@@ -2329,6 +2302,487 @@
             "broadcast_channels": [
                 "MSG",
                 "NBC Sports BA"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "ce00540ec850a55574d6",
+            "league": "NHL",
+            "espn_event_id": "401893133",
+            "favorite_teams": [
+                "NHL:SJS"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "EDM",
+            "away_team": "SJS",
+            "home_name": "Edmonton Oilers",
+            "away_name": "San Jose Sharks",
+            "start_at": "2027-01-14T02:00:00+00:00",
+            "game_date": "2027-01-13",
+            "game_time": "21:00",
+            "broadcast_channels": [
+                "NBC Sports BA"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "371243488ae5bbe03215",
+            "league": "NHL",
+            "espn_event_id": "401892707",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "completed",
+            "home_team": "VGK",
+            "away_team": "NSH",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "Nashville Predators",
+            "start_at": "2026-11-14T03:00:00+00:00",
+            "game_date": "2026-11-13",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "ESPN+",
+                "Scripps Sports"
+            ],
+            "sources": [],
+            "last_start_attempt": "2026-11-14T03:00:03.334080+00:00",
+            "last_start_error": "",
+            "source_used": "games",
+            "selected_feed_id": "manual1794581709_home",
+            "matched_fixture_name": "VegasGolden-Knights @ Nashville-Predators",
+            "last_preflight_check": "2026-11-14T02:59:33.330835+00:00",
+            "preflight_source": "games",
+            "preflight_feed_id": "manual1794581709_home",
+            "preflight_feed_error": "",
+            "last_game_status": {
+                "event_id": "401892707",
+                "state": "post",
+                "description": "Final",
+                "completed": true,
+                "period": 0,
+                "clock": "",
+                "summary_completed": true,
+                "schedule_completed": true
+            },
+            "last_game_status_check": "2026-11-14T05:58:42.188348+00:00",
+            "last_game_status_error": "",
+            "stop_reason": "espn_final"
+        },
+        {
+            "game_id": "647abba89759db03f1b1",
+            "league": "NHL",
+            "espn_event_id": "401892724",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "VAN",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "Vancouver Canucks",
+            "start_at": "2026-11-16T02:00:00+00:00",
+            "game_date": "2026-11-15",
+            "game_time": "21:00",
+            "broadcast_channels": [
+                "ESPN+",
+                "Scripps Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "bf20d153129b86c632ea",
+            "league": "NHL",
+            "espn_event_id": "401892737",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "DAL",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "Dallas Stars",
+            "start_at": "2026-11-18T03:00:00+00:00",
+            "game_date": "2026-11-17",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "TNT",
+                "truTV"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "40c8da9bfa76004c4a00",
+            "league": "NHL",
+            "espn_event_id": "401892753",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "DAL",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "Dallas Stars",
+            "start_at": "2026-11-20T03:00:00+00:00",
+            "game_date": "2026-11-19",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "Disney+",
+                "ESPN+",
+                "Hulu"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "cee2f3572be556f4e1ab",
+            "league": "NHL",
+            "espn_event_id": "401892764",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "WPG",
+            "away_team": "VGK",
+            "home_name": "Winnipeg Jets",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2026-11-22T00:00:00+00:00",
+            "game_date": "2026-11-21",
+            "game_time": "19:00",
+            "broadcast_channels": [
+                "ESPN+",
+                "Scripps Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "366c677c4419d7619dc7",
+            "league": "NHL",
+            "espn_event_id": "401892780",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "EDM",
+            "away_team": "VGK",
+            "home_name": "Edmonton Oilers",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2026-11-25T01:00:00+00:00",
+            "game_date": "2026-11-24",
+            "game_time": "20:00",
+            "broadcast_channels": [
+                "TNT"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "6dd57695f072d2576553",
+            "league": "NHL",
+            "espn_event_id": "401892810",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "MTL",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "Montreal Canadiens",
+            "start_at": "2026-11-28T21:00:00+00:00",
+            "game_date": "2026-11-28",
+            "game_time": "16:00",
+            "broadcast_channels": [
+                "ESPN+",
+                "Scripps Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "b9e393bc0600509fc416",
+            "league": "NHL",
+            "espn_event_id": "401892839",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "LAK",
+            "away_team": "VGK",
+            "home_name": "Los Angeles Kings",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2026-12-02T03:00:00+00:00",
+            "game_date": "2026-12-01",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "Scripps Sports",
+                "ABTV"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "57468bd548fd51fbd020",
+            "league": "NHL",
+            "espn_event_id": "401892853",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "UTA",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "Utah Mammoth",
+            "start_at": "2026-12-04T03:00:00+00:00",
+            "game_date": "2026-12-03",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "Utah 16",
+                "Scripps Sports",
+                "Mammoth+"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "d238970dac3d25727a1b",
+            "league": "NHL",
+            "espn_event_id": "401892867",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "WPG",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "Winnipeg Jets",
+            "start_at": "2026-12-06T00:00:00+00:00",
+            "game_date": "2026-12-05",
+            "game_time": "19:00",
+            "broadcast_channels": [
+                "Scripps Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "3bdce0d9124a695dc64c",
+            "league": "NHL",
+            "espn_event_id": "401892881",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "MTL",
+            "away_team": "VGK",
+            "home_name": "Montreal Canadiens",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2026-12-09T00:00:00+00:00",
+            "game_date": "2026-12-08",
+            "game_time": "19:00",
+            "broadcast_channels": [
+                "Scripps Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "ec611e1b4ed55f922939",
+            "league": "NHL",
+            "espn_event_id": "401892896",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "OTT",
+            "away_team": "VGK",
+            "home_name": "Ottawa Senators",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2026-12-11T00:00:00+00:00",
+            "game_date": "2026-12-10",
+            "game_time": "19:00",
+            "broadcast_channels": [
+                "Scripps Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "5231538ae1dbbffebf5e",
+            "league": "NHL",
+            "espn_event_id": "401892914",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "TOR",
+            "away_team": "VGK",
+            "home_name": "Toronto Maple Leafs",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2026-12-13T00:00:00+00:00",
+            "game_date": "2026-12-12",
+            "game_time": "19:00",
+            "broadcast_channels": [
+                "Scripps Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "bdfe722038a874cb5d4e",
+            "league": "NHL",
+            "espn_event_id": "401892960",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "NYI",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "New York Islanders",
+            "start_at": "2026-12-19T03:00:00+00:00",
+            "game_date": "2026-12-18",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "MSGSN",
+                "Scripps Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "32b4aaf8f2976c0da055",
+            "league": "NHL",
+            "espn_event_id": "401892993",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "ANA",
+            "away_team": "VGK",
+            "home_name": "Anaheim Ducks",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2026-12-23T02:30:00+00:00",
+            "game_date": "2026-12-22",
+            "game_time": "21:30",
+            "broadcast_channels": [
+                "TNT",
+                "truTV"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "1376ff78eb38e498df0b",
+            "league": "NHL",
+            "espn_event_id": "401893012",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "MIN",
+            "away_team": "VGK",
+            "home_name": "Minnesota Wild",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2026-12-28T19:00:00+00:00",
+            "game_date": "2026-12-28",
+            "game_time": "14:00",
+            "broadcast_channels": [
+                "Scripps Sports",
+                "MINNHL"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "ef41a724edb3c5455be8",
+            "league": "NHL",
+            "espn_event_id": "401893024",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "CHI",
+            "away_team": "VGK",
+            "home_name": "Chicago Blackhawks",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2026-12-30T01:00:00+00:00",
+            "game_date": "2026-12-29",
+            "game_time": "20:00",
+            "broadcast_channels": [
+                "CHSN",
+                "Scripps Sports"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "83a75a9b23b009361bac",
+            "league": "NHL",
+            "espn_event_id": "401893039",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "STL",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "St. Louis Blues",
+            "start_at": "2026-12-31T20:00:00+00:00",
+            "game_date": "2026-12-31",
+            "game_time": "15:00",
+            "broadcast_channels": [
+                "Blues App",
+                "Scripps Sports",
+                "BN+",
+                "ABC32"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "ccf6b9a75911413b64a2",
+            "league": "NHL",
+            "espn_event_id": "401893095",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "MIN",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "Minnesota Wild",
+            "start_at": "2027-01-08T02:30:00+00:00",
+            "game_date": "2027-01-07",
+            "game_time": "21:30",
+            "broadcast_channels": [
+                "ESPN"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "69c176a37a0f75100628",
+            "league": "NHL",
+            "espn_event_id": "401893112",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "VGK",
+            "away_team": "SEA",
+            "home_name": "Vegas Golden Knights",
+            "away_name": "Seattle Kraken",
+            "start_at": "2027-01-10T03:00:00+00:00",
+            "game_date": "2027-01-09",
+            "game_time": "22:00",
+            "broadcast_channels": [
+                "Scripps Sports",
+                "KONG",
+                "Prime Video (Local)"
+            ],
+            "sources": []
+        },
+        {
+            "game_id": "5f28895aad02ac086225",
+            "league": "NHL",
+            "espn_event_id": "401893123",
+            "favorite_teams": [
+                "NHL:VGK"
+            ],
+            "recording_state": "scheduled",
+            "home_team": "WSH",
+            "away_team": "VGK",
+            "home_name": "Washington Capitals",
+            "away_name": "Vegas Golden Knights",
+            "start_at": "2027-01-13T00:00:00+00:00",
+            "game_date": "2027-01-12",
+            "game_time": "19:00",
+            "broadcast_channels": [
+                "Scripps Sports"
             ],
             "sources": []
         }

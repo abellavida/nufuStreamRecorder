@@ -11,6 +11,7 @@ A lightweight, Flask-powered Digital Video Recorder (DVR) designed to schedule a
 - **Real-time Monitoring**: Visual indicators for active recordings with a "Live" pulse badge.
 - **Smart Search**: Instant "Filter-as-you-type" search bars for both the channel list and the completed recordings library.
 - **FFmpeg Engine**: Uses standard FFmpeg for high-quality stream capturing without transcoding (direct copy).
+- **Sports Folders**: Sports recordings are routed under the configured recording path: NHL to `Hockey`, NFL to `Football`, and MLB to `Baseball`; other recordings remain at the root.
 - **Production Ready**: Robust path handling, rotating logs, and thread-safe recording management.
 
 ## 🚀 Getting Started
@@ -26,18 +27,18 @@ A lightweight, Flask-powered Digital Video Recorder (DVR) designed to schedule a
 
 2. **Install dependencies** from PowerShell on Windows:
    ```powershell
-   py -m pip install Flask requests schedule
+   py -m pip install Flask requests schedule waitress
    ```
    On macOS, use:
    ```text
-   python3 -m pip install Flask requests schedule
+   python3 -m pip install Flask requests schedule waitress
    ```
 
-3. **Configure Settings** in the app. By default, recordings go to the current user's `Videos/Recordings` folder, and settings and schedules are stored beside `.venv/app.py`.
+3. **Configure Settings** in the app. By default, recordings go to the current user's `Videos/Recordings` folder; sports are saved in their league subfolders, and the dashboard library also lists nested recordings. Settings, including the optional dormant Gemini key, are stored beside `.venv/app.py`.
 
 ### Running the App
 
-Run `.venv/app.py` with Python (`py .venv/app.py` on Windows or `python3 .venv/app.py` on macOS). The app will be accessible at `http://localhost:5100`.
+Run `.venv/app.py` with Python (`py .venv/app.py` on Windows or `python3 .venv/app.py` on macOS). The app starts the background schedulers and serves the site with Waitress at `http://localhost:5100`.
 
 ## 📂 Project Structure
 

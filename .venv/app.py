@@ -30,6 +30,11 @@ DEFAULT_SETTINGS = {
     "sports_favorites": []
 }
 SPORT_RECORDING_MAX_HOURS = {"NHL": 6, "NFL": 5}
+SPORT_RECORDING_FOLDERS = {
+    "NHL": "Hockey",
+    "NFL": "Football",
+    "MLB": "Baseball",
+}
 EARLY_GAME_STATUS_POLL_INTERVAL = timedelta(minutes=5)
 LATE_GAME_STATUS_POLL_INTERVAL = timedelta(minutes=1)
 FAILED_SPORTS_START_RETRY_INTERVAL = timedelta(minutes=5)
@@ -91,6 +96,7 @@ def video_duration_display(path):
 
 def load_settings():
     loaded = DEFAULT_SETTINGS.copy()
+    gemini_key_configured = False
     if os.path.exists(SETTINGS_TEXT_FILE):
         try:
             with open(SETTINGS_TEXT_FILE, 'r', encoding="utf-8") as f:
@@ -109,6 +115,7 @@ def load_settings():
             with open(SETTINGS_FILE, 'r', encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict):
+                gemini_key_configured = bool(data.get("gemini_key") or data.get("api_key"))
                 loaded.update({key: data[key] for key in DEFAULT_SETTINGS if key in data})
                 if "paid_api" not in data and data.get("api_url"):
                     loaded["paid_api"] = data["api_url"]
@@ -136,6 +143,7 @@ def load_settings():
         for favorite in configured_favorites
         if (parsed := sports.parse_team_id(favorite))
     })
+    loaded["gemini_key_configured"] = gemini_key_configured
     return loaded
 
 
@@ -149,8 +157,21 @@ def save_app_settings(data):
                 stored = existing
         except (OSError, json.JSONDecodeError) as exc:
             logging.error("Unable to preserve existing JSON settings: %s", exc)
-    stored.update(data)
-    stored.pop("gemini_key", None)
+    stored.update({
+        key: value for key, value in data.items()
+        if key not in {"gemini_key", "gemini_key_configured", "clear_gemini_key"}
+    })
+    gemini_key = str(data.get("gemini_key") or "").strip()
+    if data.get("clear_gemini_key"):
+        stored.pop("gemini_key", None)
+        stored.pop("api_key", None)
+    else:
+        if gemini_key:
+            stored["gemini_key"] = gemini_key
+        if "api_key" in stored:
+            legacy_key = stored.pop("api_key")
+            if not stored.get("gemini_key"):
+                stored["gemini_key"] = legacy_key
     stored.pop("groq_key", None)
     stored.pop("groq_api_key", None)
     stored.pop("favorite_nhl_teams", None)
@@ -627,14 +648,20 @@ def record_stream(
 
     try:
         save_path = os.path.abspath(os.path.expanduser(settings['save_path']))
-        os.makedirs(save_path, exist_ok=True)
+        sport_folder = (
+            SPORT_RECORDING_FOLDERS.get(str(sports_game.get("league", "")).upper())
+            if isinstance(sports_game, dict)
+            else None
+        )
+        recording_path = os.path.join(save_path, sport_folder) if sport_folder else save_path
+        os.makedirs(recording_path, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
         clean_name = filename_component(name)
 
         prefix = filename_component(custom_prefix) if custom_prefix.strip() else ""
         prefix_str = f"{prefix}_" if prefix else ""
-        filename = os.path.join(save_path, f"{prefix_str}{clean_name}_{timestamp}.mp4")
+        filename = os.path.join(recording_path, f"{prefix_str}{clean_name}_{timestamp}.mp4")
 
         recording_started = time.monotonic()
         last_returncode = None
@@ -711,6 +738,7 @@ def record_stream(
                 "Sports stream ended before its recording window: %s (FFmpeg exit %s)",
                 name, proc.returncode,
             )
+            discard_unplayable_recording_part(part_filename)
             failed_stream_urls.add(stream_url)
             while True:
                 remaining = duration - (time.monotonic() - recording_started)
@@ -790,6 +818,47 @@ def record_stream(
         logging.info(f"RECORDING FINISHED: {name}")
 
 
+def discard_unplayable_recording_part(path):
+    if not os.path.isfile(path):
+        return
+
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                path,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=15,
+        )
+    except subprocess.CalledProcessError:
+        reason = "ffprobe could not read the file"
+    except (OSError, subprocess.SubprocessError) as exc:
+        logging.warning("Unable to validate retry recording part %s: %s", path, exc)
+        return
+    else:
+        try:
+            duration = float(result.stdout.strip())
+        except ValueError:
+            reason = "ffprobe returned no valid duration"
+        else:
+            if math.isfinite(duration) and duration >= 1:
+                return
+            reason = "recording is shorter than one second"
+
+    try:
+        os.remove(path)
+    except OSError as exc:
+        logging.warning("Unable to remove unusable recording part %s: %s", path, exc)
+    else:
+        logging.info("Removed unusable retry recording part %s: %s", path, reason)
+
+
 def _run_scheduled_job(task):
     try:
         item = sports.feed_stream_by_id(get_nufu_feed(), task['id'])
@@ -855,29 +924,34 @@ def index():
     files = []
     save_path = os.path.abspath(os.path.expanduser(settings['save_path']))
     if os.path.exists(save_path):
-        for f in os.listdir(save_path):
-            if f.endswith('.mp4'):
-                p = os.path.join(save_path, f)
+        for root, _, filenames in os.walk(save_path):
+            for filename in filenames:
+                if not filename.lower().endswith('.mp4'):
+                    continue
+                path = os.path.join(root, filename)
                 try:
-                    stat = os.stat(p)
+                    stat = os.stat(path)
                     try:
-                        duration_str = video_duration_display(p)
+                        duration_str = video_duration_display(path)
                     except (OSError, subprocess.SubprocessError, ValueError) as exc:
-                        logging.warning("Unable to determine video duration for %s: %s", p, exc)
+                        logging.warning("Unable to determine video duration for %s: %s", path, exc)
                         duration_str = "Unknown"
 
                     dt = datetime.fromtimestamp(stat.st_mtime)
                     files.append({
-                        'name': f,
+                        'name': os.path.relpath(path, save_path),
                         'size': f"{stat.st_size // (1024 * 1024)} MB",
                         'date': dt.strftime('%b %d, %Y').upper(),
                         'time_created': dt.strftime('%I:%M %p'),
                         'duration': duration_str
                     })
                 except Exception as e:
-                    print(f"Error processing file {f}: {e}")
+                    logging.warning("Error processing recording file %s: %s", path, e)
 
-        files.sort(key=lambda x: os.path.getmtime(os.path.join(save_path, x['name'])), reverse=True)
+        files.sort(
+            key=lambda item: os.path.getmtime(os.path.join(save_path, item['name'])),
+            reverse=True,
+        )
 
     return render_template('index.html',
                            data=api_data,
@@ -933,6 +1007,8 @@ def settings_page():
         settings.update({
             'paid_api': request.form.get('paid_api'),
             'save_path': request.form.get('save_path'),
+            'gemini_key': request.form.get('gemini_key', ''),
+            'clear_gemini_key': request.form.get('clear_gemini_key') == '1',
         })
         save_app_settings(settings)
         return redirect('/')
@@ -983,8 +1059,10 @@ def favorites_page():
 
 
 if __name__ == '__main__':
+    from waitress import serve
+
     threading.Thread(target=run_scheduler_loop, daemon=True).start()
     threading.Thread(target=run_sports_monitor_loop, daemon=True).start()
-    app.run(host='0.0.0.0', port=5100, debug=True, use_reloader=False)
+    serve(app, host='0.0.0.0', port=5000)
 
 # Update 5.15.2026
