@@ -1,0 +1,11 @@
+.git
+.idea
+**/__pycache__/
+.venv/bin/
+.venv/lib/
+.venv/recordings/
+.venv/settings.json
+.venv/settings.txt
+.venv/schedules.json
+.venv/team_schedule.json
+.venv/*.log
